@@ -1,7 +1,7 @@
 // Form Component
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { User, Building2, MapPin, MessageSquare, CheckCircle, Minus, Plus, Lock, Upload, Search } from "lucide-react";
 import { useDaumPostcodePopup } from "react-daum-postcode";
 
@@ -43,6 +43,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
   const [selectedProductId, setSelectedProductId] = useState(PRODUCTS[0].id);
   const [quantity, setQuantity] = useState(1);
   const [contractMonths, setContractMonths] = useState(36);
+  const [isMobile, setIsMobile] = useState(false);
   const [orderSuccess, setOrderSuccess] = useState<{
     orderNumber: string;
     productName: string;
@@ -64,6 +65,14 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
     setQuantity(1);
     setSelectedProductId(PRODUCTS[0].id);
   };
+
+  useEffect(() => {
+    const checkMobile = () => {
+      const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
+      return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+    };
+    setIsMobile(checkMobile());
+  }, []);
 
   const selectedProduct = PRODUCTS.find((p) => p.id === selectedProductId)!;
   const totalMonthlyPrice = selectedProduct.monthlyPrice * quantity;
@@ -162,7 +171,12 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           resetForm();
 
           try {
-            if (typeof (window as any).KCP_Pay_Execute_Web !== "undefined") {
+            if (isMobile) {
+              // Mobile implementation
+              kcpForm.action = process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp";
+              kcpForm.submit();
+            } else if (typeof (window as any).KCP_Pay_Execute_Web !== "undefined") {
+              // PC implementation (Plug-in)
               (window as any).m_Completepayment = function (form: any, closeEvent: any) {
                 form.action = "/api/payment/callback";
                 form.submit();
@@ -501,7 +515,13 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
       </form>
 
       {/* KCP PG Hidden Form Structure */}
-      <form name="order_info" id="order_info" method="post" action="https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp" className="hidden">
+      <form
+        name="order_info"
+        id="order_info"
+        method="post"
+        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp") : "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"}
+        className="hidden"
+      >
         <input type="hidden" name="pay_method" value="100000000000" />
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" id="good_name" value="" />
