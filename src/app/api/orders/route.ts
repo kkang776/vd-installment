@@ -75,16 +75,31 @@ export async function POST(request: Request) {
         tradeRegParams.append("pay_method", "CARD");
         tradeRegParams.append("Ret_URL", `${baseUrl}/api/payment/callback`);
 
+        console.log("KCP Trade Registration Request:", Object.fromEntries(tradeRegParams.entries()));
+
         const tradeRegRes = await fetch(
           process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
           {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" },
             body: tradeRegParams.toString(),
           }
         );
 
-        const tradeRegResult = await tradeRegRes.json();
+        const rawResText = await tradeRegRes.text();
+        console.log("KCP Trade Registration Raw Response:", rawResText);
+
+        let tradeRegResult;
+        try {
+          tradeRegResult = JSON.parse(rawResText);
+        } catch (e) {
+          console.error("KCP Response is not JSON:", rawResText);
+          return NextResponse.json({
+            success: false,
+            error: `KCP 서버 응답 형식이 올바르지 않습니다. (비 JSON 응답)`,
+          });
+        }
+
         if (tradeRegResult.res_cd === "0000") {
           approval_key = tradeRegResult.approval_key;
           PayUrl = tradeRegResult.PayUrl;
