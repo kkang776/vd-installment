@@ -141,6 +141,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
       if (businessRegCertFile) {
         data.append("businessRegCertFile", businessRegCertFile);
       }
+      data.append("isMobile", isMobile.toString());
 
       const res = await fetch("/api/orders", {
         method: "POST",
@@ -162,6 +163,12 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           setFieldValue("buyr_tel1", formData.ordererPhone);
           setFieldValue("ordr_idxx", result.orderNumber);
 
+          // Mobile specific fields
+          if (isMobile && result.approval_key) {
+            setFieldValue("approval_key", result.approval_key);
+            setFieldValue("PayUrl", result.PayUrl);
+          }
+
           setOrderSuccess({
             orderNumber: result.orderNumber,
             productName: selectedProduct.name,
@@ -171,9 +178,10 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           resetForm();
 
           try {
-            if (isMobile) {
-              // Mobile implementation
-              kcpForm.action = process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp";
+            if (isMobile && result.approval_key) {
+              // Mobile implementation as per KCP guide
+              const payUrl = result.PayUrl;
+              kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
               kcpForm.submit();
             } else if (typeof (window as any).KCP_Pay_Execute_Web !== "undefined") {
               // PC implementation (Plug-in)
@@ -530,9 +538,12 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
         <input type="hidden" name="buyr_mail" value={process.env.NEXT_PUBLIC_KCP_BUYER_EMAIL || "customer@vdrobotics.co.kr"} />
         <input type="hidden" name="buyr_tel1" id="buyr_tel1" value="" />
         <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000"} />
-        <input type="hidden" name="site_name" value="브이디로보틱스" />
         <input type="hidden" name="req_tx" value="pay" />
-        <input type="hidden" name="currency" value="WON" />
+        <input type="hidden" name="currency" value="410" />
+        <input type="hidden" name="shop_name" value="브이디로보틱스" />
+        <input type="hidden" name="approval_key" id="approval_key" value="" />
+        <input type="hidden" name="PayUrl" id="PayUrl" value="" />
+        <input type="hidden" name="good_cd" value="00" />
         <input type="hidden" name="Ret_URL" value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/payment/callback`} />
       </form>
 

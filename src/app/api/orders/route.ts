@@ -56,7 +56,54 @@ export async function POST(request: Request) {
       },
     });
 
-    return NextResponse.json({ success: true, orderId: order.id, orderNumber });
+    // 2. KCP Mobile Trade Registration (거래등록)
+    const isMobile = formData.get("isMobile") === "true";
+    let approval_key = "";
+    let PayUrl = "";
+
+    if (isMobile) {
+      try {
+        const protocol = request.headers.get("x-forwarded-proto") || "http";
+        const host = request.headers.get("host");
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
+
+        const tradeRegData = {
+          site_cd: process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000",
+          ordr_idxx: orderNumber,
+          good_mny: totalAmount.toString(),
+          good_name: productName,
+          pay_method: "CARD",
+          Ret_URL: `${baseUrl}/api/payment/callback`,
+        };
+
+        const tradeRegRes = await fetch(
+          process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(tradeRegData),
+          }
+        );
+
+        const tradeRegResult = await tradeRegRes.json();
+        if (tradeRegResult.res_cd === "0000") {
+          approval_key = tradeRegResult.approval_key;
+          PayUrl = tradeRegResult.PayUrl;
+        } else {
+          console.error("KCP Trade Registration Failed:", tradeRegResult);
+        }
+      } catch (e) {
+        console.error("KCP Trade Registration Error:", e);
+      }
+    }
+
+    return NextResponse.json({
+      success: true,
+      orderId: order.id,
+      orderNumber,
+      approval_key,
+      PayUrl,
+    });
   } catch (error) {
     console.error("Order creation error:", error);
     return NextResponse.json({ success: false, error: "Failed to create order" }, { status: 500 });
