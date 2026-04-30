@@ -3,6 +3,8 @@ import { PrismaClient } from "@prisma/client";
 
 const prisma = new PrismaClient();
 
+export const dynamic = "force-dynamic";
+
 export async function GET(req: Request) {
   return handleCallback(req);
 }
@@ -80,10 +82,10 @@ async function handleCallback(req: Request) {
             <script>
               alert("결제가 정상적으로 완료되었습니다.");
               if (window.opener) {
-                window.opener.location.href = "/?payment=success&orderId=${ordr_idxx}";
+                window.opener.location.replace("/?payment=success&orderId=${ordr_idxx}");
                 window.close();
               } else {
-                window.location.href = "/?payment=success&orderId=${ordr_idxx}";
+                window.location.replace("/?payment=success&orderId=${ordr_idxx}");
               }
             </script>
           </body>
@@ -111,7 +113,7 @@ async function handleCallback(req: Request) {
           <script>
             alert("결제 실패: ${errorMessage.replace(/"/g, '\\"')}");
             if (window.opener) window.close();
-            else window.history.back();
+            else window.location.replace("/");
           </script>
         </body>
       </html>
