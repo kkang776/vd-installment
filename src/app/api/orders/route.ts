@@ -101,14 +101,14 @@ export async function POST(request: Request) {
           });
         }
 
-        if (tradeRegResult.res_cd === "0000") {
-          approval_key = tradeRegResult.approval_key;
+        if (tradeRegResult.Code === "0000") {
+          approval_key = tradeRegResult.approvalKey;
           PayUrl = tradeRegResult.PayUrl;
         } else {
           console.error("KCP Trade Registration Failed:", tradeRegResult);
           return NextResponse.json({
             success: false,
-            error: `KCP 거래 등록 실패: [${tradeRegResult.res_cd}] ${tradeRegResult.res_msg}`,
+            error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message}`,
           });
         }
       } catch (e: any) {
