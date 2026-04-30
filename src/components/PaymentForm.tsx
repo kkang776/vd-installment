@@ -506,6 +506,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
               </button>
             </div>
           </div>
+        </div>
         </aside>
     </form>
 
