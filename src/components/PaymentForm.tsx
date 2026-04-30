@@ -69,7 +69,9 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
   useEffect(() => {
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
-      return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      const isMob = /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
+      console.log("Device detection:", { isMob, userAgent });
+      return isMob;
     };
     setIsMobile(checkMobile());
   }, []);
@@ -163,6 +165,12 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           setFieldValue("buyr_tel1", formData.ordererPhone);
           setFieldValue("ordr_idxx", result.orderNumber);
 
+          console.log("Payment Info:", {
+            isMobile,
+            hasApprovalKey: !!result.approval_key,
+            orderNumber: result.orderNumber
+          });
+
           // Mobile specific fields
           if (isMobile && result.approval_key) {
             setFieldValue("approval_key", result.approval_key);
@@ -178,11 +186,16 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           resetForm();
 
           try {
-            if (isMobile && result.approval_key) {
-              // Mobile implementation as per KCP guide
-              const payUrl = result.PayUrl;
-              kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
-              kcpForm.submit();
+            if (isMobile) {
+              if (result.approval_key) {
+                // Mobile implementation as per KCP guide
+                const payUrl = result.PayUrl;
+                kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
+                kcpForm.submit();
+              } else {
+                console.error("Mobile trade registration failed: No approval_key");
+                alert("모바일 결제 등록에 실패했습니다. (approval_key 누락)");
+              }
             } else if (typeof (window as any).KCP_Pay_Execute_Web !== "undefined") {
               // PC implementation (Plug-in)
               (window as any).m_Completepayment = function (form: any, closeEvent: any) {
@@ -199,7 +212,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           }
         }
       } else {
-        alert("주문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        alert(result.error || "주문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
       }
     } catch (error) {
       console.error(error);

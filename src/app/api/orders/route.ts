@@ -90,9 +90,17 @@ export async function POST(request: Request) {
           PayUrl = tradeRegResult.PayUrl;
         } else {
           console.error("KCP Trade Registration Failed:", tradeRegResult);
+          return NextResponse.json({
+            success: false,
+            error: `KCP 거래 등록 실패: [${tradeRegResult.res_cd}] ${tradeRegResult.res_msg}`,
+          });
         }
-      } catch (e) {
+      } catch (e: any) {
         console.error("KCP Trade Registration Error:", e);
+        return NextResponse.json({
+          success: false,
+          error: `KCP 서버 통신 오류: ${e.message}`,
+        });
       }
     }
 
