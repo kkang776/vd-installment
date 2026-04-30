@@ -67,22 +67,23 @@ export async function POST(request: Request) {
         const host = request.headers.get("host");
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
 
-        const tradeRegParams = new URLSearchParams();
-        tradeRegParams.append("site_cd", process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000");
-        tradeRegParams.append("ordr_idxx", orderNumber);
-        tradeRegParams.append("good_mny", totalAmount.toString());
-        tradeRegParams.append("good_name", productName);
-        tradeRegParams.append("pay_method", "CARD");
-        tradeRegParams.append("Ret_URL", `${baseUrl}/api/payment/callback`);
+        const tradeRegData = {
+          site_cd: process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000",
+          ordr_idxx: orderNumber,
+          good_mny: totalAmount.toString(),
+          good_name: productName,
+          pay_method: "CARD",
+          Ret_URL: `${baseUrl}/api/payment/callback`,
+        };
 
-        console.log("KCP Trade Registration Request:", Object.fromEntries(tradeRegParams.entries()));
+        console.log("KCP Trade Registration Request (JSON):", tradeRegData);
 
         const tradeRegRes = await fetch(
           process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
           {
             method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded; charset=utf-8" },
-            body: tradeRegParams.toString(),
+            headers: { "Content-Type": "application/json; charset=utf-8" },
+            body: JSON.stringify(tradeRegData),
           }
         );
 
