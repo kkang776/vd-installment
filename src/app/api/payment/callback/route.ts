@@ -13,7 +13,8 @@ export async function POST(req: Request) {
     const enc_info = formData.get("enc_info") as string;
     const tran_cd = formData.get("tran_cd") as string;
 
-    console.log("KCP Payment Callback Received:", { site_cd, ordr_idxx, tran_cd });
+    const allData = Object.fromEntries(formData.entries());
+    console.log("KCP Payment Callback Full Data:", allData);
 
     // 2. DB에서 원주문 정보 조회 (결제금액 및 수단 검증용)
     const order = await prisma.order.findUnique({

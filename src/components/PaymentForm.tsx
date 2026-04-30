@@ -543,7 +543,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
         action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp") : "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"}
         className="hidden"
       >
-        <input type="hidden" name="pay_method" value="100000000000" />
+        <input type="hidden" name="pay_method" value={isMobile ? "CARD" : "100000000000"} />
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" id="good_name" value="" />
         <input type="hidden" name="good_mny" id="good_mny" value="" />
