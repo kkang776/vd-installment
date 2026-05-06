@@ -43,16 +43,18 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const fetchUpdatedOrder = async () => {
     try {
       const res = await fetch(`/api/orders/${order.id}`);
-      const updatedOrder = await res.json();
-      setOrder(updatedOrder);
-      
-      const dbSuccess = updatedOrder.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
-      const successIds = dbSuccess.map((t: any) => t.id);
-      
-      setPaymentRows(prevRows => {
-        const remainingPending = prevRows.filter(r => r.status === "PENDING" && !successIds.includes(r.dbId));
-        return [...dbSuccess.map((t: any) => ({ ...t, id: t.id })), ...remainingPending];
-      });
+      const data = await res.json();
+      if (data.success && data.order) {
+        setOrder(data.order);
+        
+        const dbSuccess = data.order.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
+        const successIds = dbSuccess.map((t: any) => t.id);
+        
+        setPaymentRows(prevRows => {
+          const remainingPending = prevRows.filter(r => r.status === "PENDING" && !successIds.includes(r.dbId));
+          return [...dbSuccess.map((t: any) => ({ ...t, id: t.id })), ...remainingPending];
+        });
+      }
     } catch (error) {
       console.error("Failed to fetch updated order", error);
     }
