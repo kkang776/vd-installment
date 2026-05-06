@@ -5,13 +5,17 @@ import { CheckCircle, Plus, Trash2, Clock } from "lucide-react";
 
 type Order = any;
 
-// 허용 카드사 목록 (KCP card_cd 코드 기준)
+// 허용 카드사 목록 (KCP 숫자 코드 기준)
 const ALLOWED_CARDS = [
-  { code: "CCLG", name: "롯데카드" },
-  { code: "CCHN", name: "현대카드" },
-  { code: "CCKE", name: "하나카드" },
-  { code: "CCKM", name: "신한카드" },
+  { code: "CCLG", kcpCode: "71", name: "롯데카드" },
+  { code: "CCHN", kcpCode: "61", name: "현대카드" },
+  { code: "CCKE", kcpCode: "21", name: "하나카드" },
+  { code: "CCKM", kcpCode: "41", name: "신한카드" },
 ];
+
+// 천단위 콤마 포맷
+const formatNumber = (n: number) => n.toLocaleString("ko-KR");
+const parseFormattedNumber = (s: string) => parseInt(s.replace(/,/g, ""), 10) || 0;
 
 export default function CheckoutClient({ initialOrder }: { initialOrder: Order }) {
   const [order, setOrder] = useState<Order>(initialOrder);
@@ -29,7 +33,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const progressPercent = (paidAmount / totalAmount) * 100;
 
   const [paymentRows, setPaymentRows] = useState<any[]>([
-    { id: 1, amount: remainingAmount, method: "CARD", cardCode: "CCLG", cardName: "롯데카드", quota: 36, status: "PENDING" }
+    { id: 1, amount: remainingAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
   ]);
 
   // ── Effects ──
@@ -73,7 +77,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     if (paidAmount > 0 && paidAmount < totalAmount) {
       setPaymentRows([
         ...successfulTransactions.map((t: any) => ({ ...t, id: t.id })),
-        { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLG", cardName: "롯데카드", quota: 36, status: "PENDING" }
+        { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
       ]);
     } else if (paidAmount === totalAmount && totalAmount > 0) {
       setPaymentRows(successfulTransactions.map((t: any) => ({ ...t, id: t.id })));
@@ -97,7 +101,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
   const handleCardChange = (id: number, cardCode: string) => {
     const card = ALLOWED_CARDS.find(c => c.code === cardCode);
-    setPaymentRows(rows => rows.map(r => r.id === id ? { ...r, cardCode, cardName: card?.name || "" } : r));
+    setPaymentRows(rows => rows.map(r => r.id === id ? { ...r, cardCode, kcpCode: card?.kcpCode || "", cardName: card?.name || "" } : r));
   };
 
   const addRow = () => {
@@ -112,7 +116,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       return;
     }
     const newAmount = totalAmount - currentTotal;
-    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLG", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
+    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
   };
 
   const removeRow = (id: number) => {
@@ -162,11 +166,11 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
         (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "100000000000" : "001000000000";
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.transactionId;
-        (document.getElementById("quotaopt") as HTMLInputElement).value = pendingRow.quota?.toString() || "36";
+        (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
-        // Set card company restriction
-        if (pendingRow.method === "CARD" && pendingRow.cardCode) {
-          (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
+        // Set card company restriction using KCP numeric code
+        if (pendingRow.method === "CARD" && pendingRow.kcpCode) {
+          (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.kcpCode;
         }
 
         if (isMobile) {
@@ -350,9 +354,12 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
                       <label className="block text-xs font-medium text-gray-500 mb-1">결제 금액</label>
                       <div className="relative">
                         <input
-                          type="number"
-                          value={row.amount || ''}
-                          onChange={(e) => updateRow(row.id, "amount", parseInt(e.target.value) || 0)}
+                          type="text"
+                          value={row.amount ? formatNumber(row.amount) : ''}
+                          onChange={(e) => {
+                            const raw = parseFormattedNumber(e.target.value);
+                            updateRow(row.id, "amount", raw);
+                          }}
                           className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 pr-12 text-right font-bold text-lg"
                           placeholder="금액 입력"
                         />

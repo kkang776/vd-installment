@@ -17,37 +17,75 @@ async function handleCallback(req: Request) {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    let ordr_idxx;
+
+    let params: Record<string, string | null> = {};
 
     if (method === "POST") {
-      const formData = await req.formData();
-      ordr_idxx = formData.get("ordr_idxx") as string;
-    } else {
-      ordr_idxx = url.searchParams.get("ordr_idxx");
+      try {
+        const formData = await req.formData();
+        for (const [key, value] of formData.entries()) {
+          params[key] = value as string;
+        }
+      } catch {
+        // formData parsing failed
+      }
     }
 
+    // Also check URL search params as fallback
+    for (const [key, value] of url.searchParams.entries()) {
+      if (!params[key]) params[key] = value;
+    }
+
+    const ordr_idxx = params["ordr_idxx"] || null;
+    const res_cd = params["res_cd"] || null;
+    const tno = params["tno"] || null;
+    const app_no = params["app_no"] || null;
+    const card_name = params["card_name"] || null;
+
+    // If no transaction ID, redirect back to home gracefully
     if (!ordr_idxx) {
-      return NextResponse.json({ success: false, message: "Transaction ID is missing." }, { status: 400 });
+      return new NextResponse(`
+        <html>
+          <head><meta charset="utf-8"></head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.location.reload();
+                window.close();
+              } else {
+                window.location.replace("/");
+              }
+            </script>
+          </body>
+        </html>
+      `, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
-
-    // Read KCP result fields from form
-    const result_cd = method === "POST" ? (formData as any).get("res_cd") as string : url.searchParams.get("res_cd");
-    const result_msg = method === "POST" ? (formData as any).get("res_msg") as string : url.searchParams.get("res_msg");
-    const tno = method === "POST" ? (formData as any).get("tno") as string : url.searchParams.get("tno");
-    const app_no = method === "POST" ? (formData as any).get("app_no") as string : url.searchParams.get("app_no");
-    const card_name = method === "POST" ? (formData as any).get("card_name") as string : url.searchParams.get("card_name");
 
     const transaction = await prisma.paymentTransaction.findUnique({
       where: { id: ordr_idxx },
     });
 
     if (!transaction) {
-      return NextResponse.json({ success: false, message: "Transaction not found." }, { status: 404 });
+      return new NextResponse(`
+        <html>
+          <head><meta charset="utf-8"></head>
+          <body>
+            <script>
+              alert("결제 정보를 찾을 수 없습니다.");
+              if (window.opener) { window.opener.location.reload(); window.close(); }
+              else { window.location.replace("/"); }
+            </script>
+          </body>
+        </html>
+      `, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
     }
 
     // Check if KCP returned an error (user cancelled or payment failed)
-    if (result_cd && result_cd !== "0000") {
-      // Payment was cancelled or failed - clean up the PENDING transaction
+    if (res_cd && res_cd !== "0000") {
       await prisma.paymentTransaction.update({
         where: { id: transaction.id },
         data: { status: "FAILED" },
@@ -72,12 +110,11 @@ async function handleCallback(req: Request) {
       });
     }
 
-    // Use KCP-returned card name, or fallback to the stored cardCompanyName on the transaction
+    // Use KCP-returned card name, or fallback
     const resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
     const resolvedTno = tno || ("T" + Date.now().toString());
     const resolvedAppNo = app_no || Math.floor(10000000 + Math.random() * 90000000).toString();
 
-    // Update transaction to SUCCESS
     await prisma.paymentTransaction.update({
       where: { id: transaction.id },
       data: {
@@ -89,11 +126,11 @@ async function handleCallback(req: Request) {
       },
     });
 
-    // Check if entire order is fully paid now
+    // Check if entire order is fully paid
     const allTransactions = await prisma.paymentTransaction.findMany({
       where: { orderId: transaction.orderId, status: "SUCCESS" }
     });
-    
+
     const paidAmount = allTransactions.reduce((acc, t) => acc + (t.amount - t.cancelAmount), 0);
     const order = await prisma.order.findUnique({ where: { id: transaction.orderId } });
 
@@ -133,9 +170,8 @@ async function handleCallback(req: Request) {
         <head><meta charset="utf-8"></head>
         <body>
           <script>
-            alert("결제 실패: ${error.message}");
-            if (window.opener) window.close();
-            else window.history.back();
+            if (window.opener) { window.opener.location.reload(); window.close(); }
+            else { window.history.back(); }
           </script>
         </body>
       </html>
