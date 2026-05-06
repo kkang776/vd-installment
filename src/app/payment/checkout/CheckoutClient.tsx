@@ -5,12 +5,12 @@ import { CheckCircle, Plus, Trash2, Clock } from "lucide-react";
 
 type Order = any;
 
-// 허용 카드사 목록 (KCP 숫자 코드 기준)
+// 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
-  { code: "CCLG", kcpCode: "71", name: "롯데카드" },
-  { code: "CCHN", kcpCode: "61", name: "현대카드" },
-  { code: "CCKE", kcpCode: "21", name: "하나카드" },
-  { code: "CCKM", kcpCode: "41", name: "신한카드" },
+  { code: "CCLO", kcpCode: "71", name: "롯데카드" },
+  { code: "CCDI", kcpCode: "61", name: "현대카드" },
+  { code: "CCHN", kcpCode: "21", name: "하나카드" },
+  { code: "CCLG", kcpCode: "41", name: "신한카드" },
 ];
 
 // 천단위 콤마 포맷
@@ -33,7 +33,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const progressPercent = (paidAmount / totalAmount) * 100;
 
   const [paymentRows, setPaymentRows] = useState<any[]>([
-    { id: 1, amount: remainingAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
+    { id: 1, amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
   ]);
 
   // ── Effects ──
@@ -77,7 +77,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     if (paidAmount > 0 && paidAmount < totalAmount) {
       setPaymentRows([
         ...successfulTransactions.map((t: any) => ({ ...t, id: t.id })),
-        { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
+        { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
       ]);
     } else if (paidAmount === totalAmount && totalAmount > 0) {
       setPaymentRows(successfulTransactions.map((t: any) => ({ ...t, id: t.id })));
@@ -116,7 +116,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       return;
     }
     const newAmount = totalAmount - currentTotal;
-    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLG", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
+    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
   };
 
   const removeRow = (id: number) => {
@@ -179,18 +179,43 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
           kcpForm.submit();
         } else {
-          (window as any).m_Completepayment = function (form: any) {
-            form.action = "/api/payment/split-callback";
-            form.submit();
+          (window as any).m_Completepayment = async function (form: HTMLFormElement) {
+            const formData = new FormData(form);
+            const res_cd = formData.get("res_cd");
+            const res_msg = formData.get("res_msg");
+            
+            if (res_cd !== "0000") {
+              alert("결제가 취소되었거나 실패했습니다: " + res_msg);
+              setIsProcessing(false);
+              // Tell backend to mark transaction as FAILED
+              try {
+                await fetch("/api/payment/split-callback", { method: "POST", body: formData });
+              } catch (e) {}
+              return;
+            }
+
+            // Success
+            try {
+              const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
+              if (res.ok) {
+                window.location.reload();
+              } else {
+                alert("결제 검증에 실패했습니다.");
+                setIsProcessing(false);
+              }
+            } catch (e) {
+              alert("결제 처리 중 오류가 발생했습니다.");
+              setIsProcessing(false);
+            }
           };
-          // Handle KCP popup close/cancel
+
+          // Execute KCP popup
           try {
             (window as any).KCP_Pay_Execute_Web(kcpForm);
           } catch (kcpError) {
-            // User closed the KCP popup or an error occurred
-            console.log("KCP popup closed or cancelled");
+            console.log("KCP popup error");
+            setIsProcessing(false);
           }
-          setIsProcessing(false);
         }
       }
     } catch (e) {
