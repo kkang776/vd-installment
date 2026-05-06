@@ -168,9 +168,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.transactionId;
         (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
-        // Set card company restriction using KCP numeric code
-        if (pendingRow.method === "CARD" && pendingRow.kcpCode) {
-          (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.kcpCode;
+        // Set card company restriction using KCP English code (CCXX)
+        if (pendingRow.method === "CARD" && pendingRow.cardCode) {
+          (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
         }
 
         if (isMobile) {
