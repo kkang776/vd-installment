@@ -11,7 +11,20 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const [isMobile, setIsMobile] = useState(false);
   const [origin, setOrigin] = useState("");
   const [timeLeft, setTimeLeft] = useState<number>(30 * 60); // 30 minutes in seconds
+  const [isSuccess, setIsSuccess] = useState(false);
 
+  // ── Derived values (must be declared BEFORE useEffects that reference them) ──
+  const totalAmount = order.totalAmount;
+  const successfulTransactions = order.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
+  const paidAmount = successfulTransactions.reduce((acc: number, t: any) => acc + t.amount, 0);
+  const remainingAmount = totalAmount - paidAmount;
+  const progressPercent = (paidAmount / totalAmount) * 100;
+
+  const [paymentRows, setPaymentRows] = useState<any[]>([
+    { id: 1, amount: remainingAmount, method: "CARD", status: "PENDING" }
+  ]);
+
+  // ── Effects ──
   useEffect(() => {
     setOrigin(window.location.origin);
     const checkMobile = () => {
@@ -43,7 +56,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   }, [timeLeft, paidAmount, totalAmount, order.id]);
 
   useEffect(() => {
-    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+    const handleBeforeUnload = () => {
       if (paidAmount > 0 && paidAmount < totalAmount && !isSuccess) {
         navigator.sendBeacon('/api/payment/rollback', JSON.stringify({ orderId: order.id, reason: 'BROWSER_CLOSED' }));
       }
@@ -52,23 +65,8 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [paidAmount, totalAmount, order.id, isSuccess]);
 
-  const handleExtendTimer = () => {
-    setTimeLeft((prev) => prev + 10 * 60);
-  };
-
-  const totalAmount = order.totalAmount;
-  const successfulTransactions = order.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
-  const paidAmount = successfulTransactions.reduce((acc: number, t: any) => acc + t.amount, 0);
-  const remainingAmount = totalAmount - paidAmount;
-  const progressPercent = (paidAmount / totalAmount) * 100;
-
-  const [paymentRows, setPaymentRows] = useState<any[]>([
-    { id: 1, amount: remainingAmount, method: "CARD", status: "PENDING" }
-  ]);
-
   useEffect(() => {
-    // If order transactions updated, we should reconstruct the rows, 
-    // but for simplicity, let's assume rows that are SUCCESS are fixed, and we just need one PENDING row.
+    // If order transactions updated, reconstruct the rows
     if (paidAmount > 0 && paidAmount < totalAmount) {
       setPaymentRows([
         ...successfulTransactions.map((t: any) => ({ ...t, id: t.id })),
@@ -79,12 +77,15 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     }
   }, [paidAmount, totalAmount]);
 
-  const [isSuccess, setIsSuccess] = useState(false);
   useEffect(() => {
     if (paidAmount === totalAmount && totalAmount > 0) {
       setIsSuccess(true);
     }
   }, [paidAmount, totalAmount]);
+
+  const handleExtendTimer = () => {
+    setTimeLeft((prev) => prev + 10 * 60);
+  };
 
   const updateRow = (id: number, field: string, value: any) => {
     setPaymentRows(rows => rows.map(r => r.id === id ? { ...r, [field]: value } : r));
