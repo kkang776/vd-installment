@@ -56,76 +56,10 @@ export async function POST(request: Request) {
       },
     });
 
-    // 2. KCP Mobile Trade Registration (거래등록)
-    const isMobile = formData.get("isMobile") === "true";
-    let approval_key = "";
-    let PayUrl = "";
-
-    if (isMobile) {
-      try {
-        const protocol = request.headers.get("x-forwarded-proto") || "http";
-        const host = request.headers.get("host");
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
-
-        const tradeRegData = {
-          site_cd: process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000",
-          ordr_idxx: orderNumber,
-          good_mny: totalAmount.toString(),
-          good_name: productName,
-          pay_method: "CARD",
-          Ret_URL: `${baseUrl}/api/payment/callback`,
-        };
-
-        console.log("KCP Trade Registration Request (JSON):", tradeRegData);
-
-        const tradeRegRes = await fetch(
-          process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify(tradeRegData),
-          }
-        );
-
-        const rawResText = await tradeRegRes.text();
-        console.log("KCP Trade Registration Raw Response:", rawResText);
-
-        let tradeRegResult;
-        try {
-          tradeRegResult = JSON.parse(rawResText);
-        } catch (e) {
-          console.error("KCP Response is not JSON:", rawResText);
-          return NextResponse.json({
-            success: false,
-            error: `KCP 서버 응답 형식이 올바르지 않습니다. (비 JSON 응답)`,
-          });
-        }
-
-        if (tradeRegResult.Code === "0000") {
-          approval_key = tradeRegResult.approvalKey;
-          PayUrl = tradeRegResult.PayUrl;
-        } else {
-          console.error("KCP Trade Registration Failed:", tradeRegResult);
-          return NextResponse.json({
-            success: false,
-            error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message}`,
-          });
-        }
-      } catch (e: any) {
-        console.error("KCP Trade Registration Error:", e);
-        return NextResponse.json({
-          success: false,
-          error: `KCP 서버 통신 오류: ${e.message}`,
-        });
-      }
-    }
-
     return NextResponse.json({
       success: true,
       orderId: order.id,
       orderNumber,
-      approval_key,
-      PayUrl,
     });
   } catch (error) {
     console.error("Order creation error:", error);

@@ -44,11 +44,6 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
   const [quantity, setQuantity] = useState(1);
   const [contractMonths, setContractMonths] = useState(36);
   const [isMobile, setIsMobile] = useState(false);
-  const [orderSuccess, setOrderSuccess] = useState<{
-    orderNumber: string;
-    productName: string;
-    totalAmount: number;
-  } | null>(null);
 
   const resetForm = () => {
     setFormData({
@@ -152,65 +147,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
 
       const result = await res.json();
       if (result.success) {
-        const kcpForm = document.getElementById("order_info") as HTMLFormElement;
-        if (kcpForm) {
-          const setFieldValue = (id: string, value: string) => {
-            const el = document.getElementById(id) as HTMLInputElement;
-            if (el) el.value = value;
-          };
-
-          setFieldValue("good_name", selectedProduct.name);
-          setFieldValue("good_mny", totalPaymentPrice.toString());
-          setFieldValue("buyr_name", formData.ordererName);
-          setFieldValue("buyr_tel1", formData.ordererPhone);
-          setFieldValue("ordr_idxx", result.orderNumber);
-
-          console.log("Payment Info:", {
-            isMobile,
-            hasApprovalKey: !!result.approval_key,
-            orderNumber: result.orderNumber
-          });
-
-          // Mobile specific fields
-          if (isMobile && result.approval_key) {
-            setFieldValue("approval_key", result.approval_key);
-            setFieldValue("PayUrl", result.PayUrl);
-          }
-
-          setOrderSuccess({
-            orderNumber: result.orderNumber,
-            productName: selectedProduct.name,
-            totalAmount: totalPaymentPrice,
-          });
-
-          resetForm();
-
-          try {
-            if (isMobile) {
-              if (result.approval_key) {
-                // Mobile implementation as per KCP guide
-                const payUrl = result.PayUrl;
-                kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
-                kcpForm.submit();
-              } else {
-                console.error("Mobile trade registration failed: No approval_key");
-                alert("모바일 결제 등록에 실패했습니다. (approval_key 누락)");
-              }
-            } else if (typeof (window as any).KCP_Pay_Execute_Web !== "undefined") {
-              // PC implementation (Plug-in)
-              (window as any).m_Completepayment = function (form: any, closeEvent: any) {
-                form.action = "/api/payment/callback";
-                form.submit();
-              };
-              (window as any).KCP_Pay_Execute_Web(kcpForm);
-            } else {
-              kcpForm.submit();
-            }
-          } catch (e) {
-            console.error("KCP payment window error:", e);
-            kcpForm.submit();
-          }
-        }
+        window.location.href = `/payment/checkout?orderId=${result.orderId}`;
       } else {
         alert(result.error || "주문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
       }
@@ -534,77 +471,6 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           </div>
         </aside>
       </form>
-
-      {/* KCP PG Hidden Form Structure */}
-      <form
-        name="order_info"
-        id="order_info"
-        method="post"
-        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp") : "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"}
-        className="hidden"
-      >
-        <input type="hidden" name="pay_method" value={isMobile ? "CARD" : "100000000000"} />
-        <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
-        <input type="hidden" name="good_name" id="good_name" value="" />
-        <input type="hidden" name="good_mny" id="good_mny" value="" />
-        <input type="hidden" name="buyr_name" id="buyr_name" value="" />
-        <input type="hidden" name="buyr_mail" value={process.env.NEXT_PUBLIC_KCP_BUYER_EMAIL || "customer@vdrobotics.co.kr"} />
-        <input type="hidden" name="buyr_tel1" id="buyr_tel1" value="" />
-        <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000"} />
-        <input type="hidden" name="req_tx" value="pay" />
-        <input type="hidden" name="currency" value="410" />
-        <input type="hidden" name="shop_name" value="브이디로보틱스" />
-        <input type="hidden" name="approval_key" id="approval_key" value="" />
-        <input type="hidden" name="PayUrl" id="PayUrl" value="" />
-        <input type="hidden" name="good_cd" value="00" />
-        <input type="hidden" name="Ret_URL" value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/payment/callback`} />
-      </form>
-
-      {/* 주문 완료 모달 */}
-      {orderSuccess && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md overflow-hidden animate-in zoom-in-95 duration-300">
-            <div className="bg-red-500 p-8 text-center text-white">
-              <div className="w-16 h-16 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4">
-                <CheckCircle className="w-10 h-10 text-white" />
-              </div>
-              <h2 className="text-2xl font-bold mb-1">할부 신청 완료!</h2>
-              <p className="text-white/80 text-sm">주문이 성공적으로 접수되었습니다.</p>
-            </div>
-
-            <div className="p-8">
-              <div className="space-y-4 mb-8">
-                <div className="flex justify-between items-center py-2 border-b border-gray-50 text-sm">
-                  <span className="text-gray-500">주문번호</span>
-                  <span className="font-bold text-gray-900">{orderSuccess.orderNumber}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50 text-sm">
-                  <span className="text-gray-500">신청 상품</span>
-                  <span className="font-medium">{orderSuccess.productName}</span>
-                </div>
-                <div className="flex justify-between items-center py-2 border-b border-gray-50 text-sm">
-                  <span className="text-gray-500">총 결제금액</span>
-                  <span className="font-bold text-red-500 text-lg">{orderSuccess.totalAmount.toLocaleString()}원</span>
-                </div>
-              </div>
-
-              <div className="bg-gray-50 rounded-xl p-4 mb-8">
-                <p className="text-gray-600 text-sm leading-relaxed text-center font-medium">
-                  영업일 기준 <span className="text-red-500">1~2일 이내</span> 엔지니어가<br />
-                  설치 일정 확인을 위해 연락드립니다.
-                </p>
-              </div>
-
-              <button
-                onClick={() => setOrderSuccess(null)}
-                className="w-full bg-gray-900 hover:bg-black text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98]"
-              >
-                확인
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
   );
 }
