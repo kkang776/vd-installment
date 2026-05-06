@@ -9,9 +9,11 @@ type PaymentTransaction = any;
 export default function CheckoutClient({ initialOrder }: { initialOrder: Order }) {
   const [order, setOrder] = useState<Order>(initialOrder);
   const [isMobile, setIsMobile] = useState(false);
+  const [origin, setOrigin] = useState("");
   const [timeLeft, setTimeLeft] = useState<number>(30 * 60); // 30 minutes in seconds
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     const checkMobile = () => {
       const userAgent = navigator.userAgent || navigator.vendor || (window as any).opera;
       return /android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(userAgent.toLowerCase());
@@ -350,7 +352,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="approval_key" id="approval_key" value="" />
         <input type="hidden" name="PayUrl" id="PayUrl" value="" />
         <input type="hidden" name="good_cd" value="00" />
-        <input type="hidden" name="Ret_URL" value={`${typeof window !== "undefined" ? window.location.origin : ""}/api/payment/split-callback`} />
+        <input type="hidden" name="Ret_URL" value={`${origin}/api/payment/split-callback`} />
         
         {/* Force 36 months and card restrictions */}
         <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
