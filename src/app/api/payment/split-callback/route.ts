@@ -30,6 +30,13 @@ async function handleCallback(req: Request) {
       return NextResponse.json({ success: false, message: "Transaction ID is missing." }, { status: 400 });
     }
 
+    // Read KCP result fields from form
+    const result_cd = method === "POST" ? (formData as any).get("res_cd") as string : url.searchParams.get("res_cd");
+    const result_msg = method === "POST" ? (formData as any).get("res_msg") as string : url.searchParams.get("res_msg");
+    const tno = method === "POST" ? (formData as any).get("tno") as string : url.searchParams.get("tno");
+    const app_no = method === "POST" ? (formData as any).get("app_no") as string : url.searchParams.get("app_no");
+    const card_name = method === "POST" ? (formData as any).get("card_name") as string : url.searchParams.get("card_name");
+
     const transaction = await prisma.paymentTransaction.findUnique({
       where: { id: ordr_idxx },
     });
@@ -38,18 +45,46 @@ async function handleCallback(req: Request) {
       return NextResponse.json({ success: false, message: "Transaction not found." }, { status: 404 });
     }
 
-    // Mock KCP result (In real implementation, you'd verify with KCP API here)
-    const mockTno = "T" + Date.now().toString();
-    const mockAppNo = Math.floor(10000000 + Math.random() * 90000000).toString(); // 8 digits
+    // Check if KCP returned an error (user cancelled or payment failed)
+    if (result_cd && result_cd !== "0000") {
+      // Payment was cancelled or failed - clean up the PENDING transaction
+      await prisma.paymentTransaction.update({
+        where: { id: transaction.id },
+        data: { status: "FAILED" },
+      });
+
+      return new NextResponse(`
+        <html>
+          <head><meta charset="utf-8"></head>
+          <body>
+            <script>
+              if (window.opener) {
+                window.opener.location.reload();
+                window.close();
+              } else {
+                window.location.replace("/payment/checkout?orderId=${transaction.orderId}");
+              }
+            </script>
+          </body>
+        </html>
+      `, {
+        headers: { "Content-Type": "text/html; charset=utf-8" },
+      });
+    }
+
+    // Use KCP-returned card name, or fallback to the stored cardCompanyName on the transaction
+    const resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
+    const resolvedTno = tno || ("T" + Date.now().toString());
+    const resolvedAppNo = app_no || Math.floor(10000000 + Math.random() * 90000000).toString();
 
     // Update transaction to SUCCESS
     await prisma.paymentTransaction.update({
       where: { id: transaction.id },
       data: {
         status: "SUCCESS",
-        pgTid: mockTno,
-        pgAppNo: mockAppNo,
-        cardCompanyName: transaction.method === "CARD" ? "현대카드" : "가상계좌",
+        pgTid: resolvedTno,
+        pgAppNo: resolvedAppNo,
+        cardCompanyName: resolvedCardName,
         pgAppDate: new Date().toISOString(),
       },
     });

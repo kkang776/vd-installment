@@ -5,7 +5,7 @@ const prisma = new PrismaClient();
 
 export async function POST(request: Request) {
   try {
-    const { orderId, amount, method, isMobile } = await request.json();
+    const { orderId, amount, method, isMobile, cardCompanyName } = await request.json();
 
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
@@ -19,6 +19,7 @@ export async function POST(request: Request) {
         amount,
         method,
         status: "PENDING",
+        cardCompanyName: cardCompanyName || null,
       }
     });
 
