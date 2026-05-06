@@ -32,9 +32,31 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const remainingAmount = totalAmount - paidAmount;
   const progressPercent = (paidAmount / totalAmount) * 100;
 
-  const [paymentRows, setPaymentRows] = useState<any[]>([
-    { id: 1, amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
-  ]);
+  const [paymentRows, setPaymentRows] = useState<any[]>(() => {
+    const successRows = successfulTransactions.map((t: any) => ({ ...t, id: t.id }));
+    if (remainingAmount > 0) {
+      return [...successRows, { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }];
+    }
+    return successRows;
+  });
+
+  const fetchUpdatedOrder = async () => {
+    try {
+      const res = await fetch(`/api/orders/${order.id}`);
+      const updatedOrder = await res.json();
+      setOrder(updatedOrder);
+      
+      const dbSuccess = updatedOrder.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
+      const successIds = dbSuccess.map((t: any) => t.id);
+      
+      setPaymentRows(prevRows => {
+        const remainingPending = prevRows.filter(r => r.status === "PENDING" && !successIds.includes(r.dbId));
+        return [...dbSuccess.map((t: any) => ({ ...t, id: t.id })), ...remainingPending];
+      });
+    } catch (error) {
+      console.error("Failed to fetch updated order", error);
+    }
+  };
 
   // ── Effects ──
   useEffect(() => {
@@ -72,17 +94,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
   }, [paidAmount, totalAmount, order.id, isSuccess]);
-
-  useEffect(() => {
-    if (paidAmount > 0 && paidAmount < totalAmount) {
-      setPaymentRows([
-        ...successfulTransactions.map((t: any) => ({ ...t, id: t.id })),
-        { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }
-      ]);
-    } else if (paidAmount === totalAmount && totalAmount > 0) {
-      setPaymentRows(successfulTransactions.map((t: any) => ({ ...t, id: t.id })));
-    }
-  }, [paidAmount, totalAmount]);
 
   useEffect(() => {
     if (paidAmount === totalAmount && totalAmount > 0) {
@@ -160,6 +171,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         setIsProcessing(false);
         return;
       }
+      
+      // Update the row with the newly created DB transaction ID
+      updateRow(pendingRow.id, "dbId", data.transactionId);
 
       const kcpForm = document.getElementById("order_info") as HTMLFormElement;
       if (kcpForm) {
@@ -179,12 +193,13 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
           kcpForm.submit();
         } else {
-          (window as any).m_Completepayment = async function (form: HTMLFormElement) {
+          (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
             const formData = new FormData(form);
             const res_cd = formData.get("res_cd");
             const res_msg = formData.get("res_msg");
             
             if (res_cd !== "0000") {
+              if (typeof closeEvent === "function") closeEvent();
               alert("결제가 취소되었거나 실패했습니다: " + res_msg);
               setIsProcessing(false);
               // Tell backend to mark transaction as FAILED
@@ -196,9 +211,11 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
             // Success
             try {
+              if (typeof closeEvent === "function") closeEvent();
               const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
               if (res.ok) {
-                window.location.reload();
+                await fetchUpdatedOrder();
+                setIsProcessing(false);
               } else {
                 alert("결제 검증에 실패했습니다.");
                 setIsProcessing(false);
