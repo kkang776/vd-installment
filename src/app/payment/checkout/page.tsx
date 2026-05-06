@@ -1,8 +1,8 @@
-import { PrismaClient } from "@prisma/client";
 import { notFound } from "next/navigation";
 import CheckoutClient from "./CheckoutClient";
+import prisma from "@/lib/prisma";
 
-const prisma = new PrismaClient();
+export const dynamic = "force-dynamic";
 
 export default async function CheckoutPage({ searchParams }: { searchParams: { orderId: string } }) {
   const { orderId } = await searchParams;
