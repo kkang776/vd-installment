@@ -191,8 +191,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
         if (isMobile) {
           (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
-          const payUrl = data.PayUrl;
-          kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
+          kcpForm.action = data.PayUrl;
           kcpForm.submit();
         } else {
           (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
@@ -255,7 +254,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       const data = await res.json();
       if (data.success) {
         alert("취소되었습니다.");
-        window.location.reload();
+        fetchUpdatedOrder();
       } else {
         alert("취소 실패: " + data.error);
       }

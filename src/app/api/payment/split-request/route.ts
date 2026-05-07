@@ -46,8 +46,8 @@ export async function POST(request: Request) {
           process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
           {
             method: "POST",
-            headers: { "Content-Type": "application/json; charset=utf-8" },
-            body: JSON.stringify(tradeRegData),
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: new URLSearchParams(tradeRegData as any).toString(),
           }
         );
 
