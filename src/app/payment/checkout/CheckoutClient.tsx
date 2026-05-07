@@ -24,6 +24,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const [timeLeft, setTimeLeft] = useState<number>(30 * 60);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isVerifying, setIsVerifying] = useState(false);
 
   // ── Derived values ──
   const totalAmount = order.totalAmount;
@@ -213,17 +214,18 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
             // Success
             try {
               if (typeof closeEvent === "function") closeEvent();
+              setIsVerifying(true);
               const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
               if (res.ok) {
                 await fetchUpdatedOrder();
-                setIsProcessing(false);
               } else {
                 alert("결제 검증에 실패했습니다.");
-                setIsProcessing(false);
               }
             } catch (e) {
               alert("결제 처리 중 오류가 발생했습니다.");
+            } finally {
               setIsProcessing(false);
+              setIsVerifying(false);
             }
           };
 
@@ -265,6 +267,14 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
   return (
     <div className="space-y-8">
+      {isVerifying && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-red-500 rounded-full animate-spin mb-6"></div>
+          <p className="text-white text-xl font-bold">결제를 확인 중입니다...</p>
+          <p className="text-white/80 mt-2">잠시만 기다려주세요.</p>
+        </div>
+      )}
+
       {/* 1. Order Summary */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
         <h2 className="text-xl font-bold mb-6">주문 정보 요약</h2>

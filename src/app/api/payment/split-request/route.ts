@@ -38,7 +38,7 @@ export async function POST(request: Request) {
           ordr_idxx: transaction.id, // Using transaction ID for KCP to track split payments
           good_mny: amount.toString(),
           good_name: order.productName,
-          pay_method: method === "CARD" ? "CARD" : "VACCOUNT",
+          pay_method: method === "CARD" ? "CARD" : "VCNT",
           Ret_URL: `${baseUrl}/api/payment/split-callback`,
         };
 

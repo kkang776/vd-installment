@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { PrismaClient } from "@prisma/client";
+import { sendAlimtalk } from "@/lib/surem";
 
 const prisma = new PrismaClient();
 
@@ -139,6 +140,17 @@ async function handleCallback(req: Request) {
         where: { id: order.id },
         data: { status: "PAID" },
       });
+      
+      // Async trigger for Alimtalk
+      sendAlimtalk({
+        orderId: order.id,
+        ordererPhone: order.ordererPhone,
+        ordererName: order.ordererName,
+        productName: order.productName,
+        quantity: order.quantity,
+        totalAmount: order.totalAmount,
+      }).catch(err => console.error("Alimtalk async error:", err));
+
     } else if (order && paidAmount > 0) {
       await prisma.order.update({
         where: { id: order.id },
