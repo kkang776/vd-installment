@@ -15,7 +15,7 @@ export async function sendAlimtalk(payload: AlimtalkPayload) {
   const templateCode = process.env.SUREM_TEMPLATE_CODE;
   const senderNum = process.env.SUREM_SENDER_NUM;
   // Default SureM API URL, adjust if needed
-  const apiUrl = process.env.SUREM_API_URL || "https://api.surem.com/message/alimtalk";
+  const apiUrl = process.env.SUREM_API_URL || "https://api.surem.com/v1/kakao/alimtalk";
 
   if (!userCode || !profileKey || !templateCode) {
     console.error("SureM environment variables are missing.");
@@ -27,27 +27,24 @@ export async function sendAlimtalk(payload: AlimtalkPayload) {
   // Formatting amount
   const formattedAmount = payload.totalAmount.toLocaleString("ko-KR");
 
-  // Build the message by replacing variables
-  const message = `결제가 완료되었습니다.
-고객명: ${payload.ordererName}
-상품명: ${payload.productName}
-상품수량: ${payload.quantity}개
-결제금액: ${formattedAmount}원`;
+  // Build the message by replacing variables (must exactly match the template scpay_01)
+  const message = `[분할 결제 완료 안내]
+안녕하세요, ${payload.ordererName} 고객님.
+주문하신 상품의 결제가 완료되어 안내드립니다.
+
+- 상품명: ${payload.productName}
+- 수량: ${payload.quantity}개
+- 총 결제금액: ${formattedAmount}원
+
+이용해 주셔서 대단히 감사합니다.`;
 
   const requestBody = {
     usercode: userCode,
-    profile_key: profileKey,
+    yellow_key: profileKey,
     template_code: templateCode,
-    req_phone: phone,
-    call_phone: senderNum || "",
-    message: message,
-    // Provide variables if SureM API uses variables array, otherwise the rendered message is usually sent
-    // variables: {
-    //   "#{고객명}": payload.ordererName,
-    //   "#{상품명}": payload.productName,
-    //   "#{상품수량}": payload.quantity.toString(),
-    //   "#{결제금액}": formattedAmount,
-    // }
+    to: phone,
+    reqphone: senderNum || "",
+    msg: message,
   };
 
   try {
@@ -66,7 +63,14 @@ export async function sendAlimtalk(payload: AlimtalkPayload) {
     clearTimeout(timeoutId);
     
     const data = await response.json().catch(() => ({}));
-    const isSuccess = response.ok && data.code === "200"; // adjust success condition as per actual SureM API
+    const isSuccess = response.ok && (
+      data.code === "200" || 
+      data.code === 200 || 
+      data.code === "0000" || 
+      data.result === "success" || 
+      data.status === "success" ||
+      data.status === 200
+    );
 
     // Log to DB
     await prisma.notificationLog.create({

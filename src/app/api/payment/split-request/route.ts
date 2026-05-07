@@ -33,8 +33,14 @@ export async function POST(request: Request) {
         const host = request.headers.get("host");
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
 
+        const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000";
+        const isTest = site_cd === "T0000" || site_cd.startsWith("T");
+        const defaultTradeRegUrl = isTest 
+          ? "https://testsmpay.kcp.co.kr/trade/register.do" 
+          : "https://smpay.kcp.co.kr/trade/register.do";
+
         const tradeRegData = {
-          site_cd: process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000",
+          site_cd,
           ordr_idxx: transaction.id, // Using transaction ID for KCP to track split payments
           good_mny: amount.toString(),
           good_name: order.productName,
@@ -43,7 +49,7 @@ export async function POST(request: Request) {
         };
 
         const tradeRegRes = await fetch(
-          process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do",
+          process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl,
           {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
