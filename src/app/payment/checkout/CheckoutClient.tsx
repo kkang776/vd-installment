@@ -187,8 +187,10 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       const kcpForm = document.getElementById("order_info") as HTMLFormElement;
       if (kcpForm) {
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
-        (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "100000000000" : "001000000000";
-        (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.transactionId;
+        (document.getElementById("pay_method") as HTMLInputElement).value = isMobile 
+          ? (pendingRow.method === "CARD" ? "CARD" : "VCNT")
+          : (pendingRow.method === "CARD" ? "100000000000" : "001000000000");
+        (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
         (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
         // Set card company restriction using KCP English code (CCXX)
@@ -197,31 +199,16 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         }
 
         if (isMobile) {
-          // Mobile: Call Edge Runtime function to register trade (bypasses Node.js IP block)
-          try {
-            const regRes = await fetch("/api/payment/kcp-register", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                site_cd: (document.getElementById("order_info") as HTMLFormElement)?.querySelector<HTMLInputElement>("[name=site_cd]")?.value || "T0000",
-                ordr_idxx: data.transactionId,
-                good_mny: pendingRow.amount.toString(),
-                good_name: order.productName,
-                pay_method: pendingRow.method === "CARD" ? "CARD" : "VCNT",
-                Ret_URL: `${origin}/api/payment/split-callback`,
-              }),
-            });
-            const regData = await regRes.json();
-            if (!regData.success) {
-              alert("모바일 결제 등록 실패: " + regData.error);
-              setIsProcessing(false);
-              return;
-            }
-            (document.getElementById("approval_key") as HTMLInputElement).value = regData.approvalKey;
-            kcpForm.action = regData.PayUrl;
+          if (data.approval_key) {
+            (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
+            (document.getElementById("PayUrl") as HTMLInputElement).value = data.PayUrl;
+            
+            // Dynamic encodingFilter.jsp action resolution from previous working code
+            const payUrl = data.PayUrl;
+            kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
             kcpForm.submit();
-          } catch (regError: any) {
-            alert("모바일 결제 연결 실패: " + regError.message);
+          } else {
+            alert("모바일 결제 등록에 실패했습니다. (approval_key 누락)");
             setIsProcessing(false);
           }
         } else {
@@ -494,7 +481,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         name="order_info"
         id="order_info"
         method="post"
-        action="https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"
+        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp") : "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"}
         className="hidden"
       >
         <input type="hidden" name="pay_method" id="pay_method" value="" />
