@@ -148,15 +148,21 @@ async function handleCallback(req: Request) {
         data: { status: "PAID" },
       });
       
-      // Async trigger for Alimtalk
-      sendAlimtalk({
-        orderId: order.id,
-        ordererPhone: order.ordererPhone,
-        ordererName: order.ordererName,
-        productName: order.productName,
-        quantity: order.quantity,
-        totalAmount: order.totalAmount,
-      }).catch(err => console.error("Alimtalk async error:", err));
+      // Send Alimtalk notification (awaited with error logging)
+      try {
+        console.log("Triggering Alimtalk for order:", order.id, order.ordererPhone);
+        const alimtalkResult = await sendAlimtalk({
+          orderId: order.id,
+          ordererPhone: order.ordererPhone,
+          ordererName: order.ordererName,
+          productName: order.productName,
+          quantity: order.quantity,
+          totalAmount: order.totalAmount,
+        });
+        console.log("Alimtalk result:", alimtalkResult);
+      } catch (err) {
+        console.error("Alimtalk send error:", err);
+      }
 
     } else if (order && paidAmount > 0) {
       await prisma.order.update({

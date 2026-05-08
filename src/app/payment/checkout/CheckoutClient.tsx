@@ -34,9 +34,13 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const progressPercent = (paidAmount / totalAmount) * 100;
 
   const [paymentRows, setPaymentRows] = useState<any[]>(() => {
-    const successRows = successfulTransactions.map((t: any) => ({ ...t, id: t.id }));
-    if (remainingAmount > 0) {
-      return [...successRows, { id: Date.now(), amount: remainingAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }];
+    // Reconstruct rows from server data (critical for mobile redirect recovery)
+    const dbSuccess = initialOrder.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
+    const dbPaid = dbSuccess.reduce((acc: number, t: any) => acc + t.amount, 0);
+    const dbRemaining = initialOrder.totalAmount - dbPaid;
+    const successRows = dbSuccess.map((t: any) => ({ ...t, id: t.id }));
+    if (dbRemaining > 0) {
+      return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }];
     }
     return successRows;
   });

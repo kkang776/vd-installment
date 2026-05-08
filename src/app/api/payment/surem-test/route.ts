@@ -2,61 +2,81 @@ import { NextResponse } from "next/server";
 
 export const dynamic = "force-dynamic";
 
-// Diagnostic endpoint to test SureM Alimtalk configuration
-export async function GET() {
-  const config = {
-    SUREM_USER_CODE: process.env.SUREM_USER_CODE ? "✅ SET" : "❌ MISSING",
-    SUREM_PROFILE_KEY: process.env.SUREM_PROFILE_KEY ? `✅ SET (${process.env.SUREM_PROFILE_KEY?.substring(0, 8)}...)` : "❌ MISSING",
-    SUREM_TEMPLATE_CODE: process.env.SUREM_TEMPLATE_CODE ? `✅ ${process.env.SUREM_TEMPLATE_CODE}` : "❌ MISSING",
-    SUREM_SENDER_NUM: process.env.SUREM_SENDER_NUM ? `✅ ${process.env.SUREM_SENDER_NUM}` : "❌ MISSING",
-    SUREM_API_URL: process.env.SUREM_API_URL || "❌ MISSING (will use default)",
+// Test endpoint to verify SureM Alimtalk API connectivity
+export async function GET(request: Request) {
+  const accessToken = process.env.SUREM_USER_CODE;
+  const senderKey = process.env.SUREM_PROFILE_KEY;
+  const templateCode = process.env.SUREM_TEMPLATE_CODE;
+  const reqPhone = (process.env.SUREM_SENDER_NUM || "").replace(/-/g, "");
+  const apiUrl = process.env.SUREM_API_URL || "https://rest.surem.com/api/v1/send/alimtalk";
+
+  // Check env vars
+  const envCheck = {
+    SUREM_USER_CODE: accessToken ? `SET (${accessToken.substring(0, 3)}...)` : "MISSING",
+    SUREM_PROFILE_KEY: senderKey ? `SET (${senderKey.substring(0, 8)}...)` : "MISSING",
+    SUREM_TEMPLATE_CODE: templateCode || "MISSING",
+    SUREM_SENDER_NUM: reqPhone || "MISSING",
+    SUREM_API_URL: apiUrl,
   };
 
-  // Try a test API call (without actually sending a message) to check connectivity
-  const apiUrl = process.env.SUREM_API_URL || "https://api.surem.com/alimtalk/v1/json/send";
-  let connectivity = "NOT_TESTED";
+  // Test with a dummy phone number (won't actually send to a real user)
+  const testPhone = "82-1012345678";
   
-  try {
-    // Send a minimal test request to check if the endpoint responds
-    const testBody = {
-      userid: process.env.SUREM_USER_CODE || "test",
-      profile_key: process.env.SUREM_PROFILE_KEY || "test",
-      messages: [
-        {
-          templatecode: process.env.SUREM_TEMPLATE_CODE || "test",
-          phone: "00000000000", // Invalid phone - won't actually send
-          callback: process.env.SUREM_SENDER_NUM || "",
-          msg_body: "테스트",
-        }
-      ]
-    };
+  const text = `[브이디로보틱스] 결제 완료 안내
+테스트님, 주문하신 상품의 결제가 정상적으로 완료되었습니다.
+■ 결제 내역
+ - 상품명 : 테스트상품
+ - 수량 : 1개
+ - 총 결제금액 : 100원
+로봇 설치 일정을 잡기 위해 담당 부서에서 영업일 기준 1~2일 내로 해피콜을 드릴 예정입니다.
+고맙습니다.`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000);
-    
-    const res = await fetch(apiUrl, {
+  const requestBody = {
+    bizType: "at",
+    senderKey,
+    templateCode,
+    to: testPhone,
+    text,
+    reqPhone,
+    reSend: "N",
+  };
+
+  let apiResult: any = {};
+  try {
+    const response = await fetch(apiUrl, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json; charset=utf-8",
-        "Accept": "application/json",
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
       },
-      body: JSON.stringify(testBody),
-      signal: controller.signal,
+      body: JSON.stringify(requestBody),
     });
-    
-    clearTimeout(timeoutId);
-    const responseText = await res.text();
-    connectivity = `Status: ${res.status} | Response: ${responseText.substring(0, 500)}`;
-  } catch (e: any) {
-    connectivity = `ERROR: ${e.message}`;
+
+    const responseText = await response.text();
+    apiResult = {
+      httpStatus: response.status,
+      httpStatusText: response.statusText,
+      responseBody: responseText,
+      parsed: (() => { try { return JSON.parse(responseText); } catch { return "NOT_JSON"; } })(),
+    };
+  } catch (error: any) {
+    apiResult = {
+      error: error.message,
+      type: error.name,
+    };
   }
 
   return NextResponse.json({
-    title: "SureM Alimtalk Configuration Check",
-    envVars: config,
-    apiConnectivity: {
+    envCheck,
+    requestSent: {
       url: apiUrl,
-      result: connectivity,
-    }
-  }, { status: 200 });
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${accessToken}`,
+      },
+      body: requestBody,
+    },
+    apiResult,
+  });
 }
