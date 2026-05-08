@@ -23,11 +23,22 @@ type Order = {
   totalAmount: number;
   status: string;
   
-  // PG 결제 정보
-  pgTid: string | null;
-  pgMethod: string | null;
-  pgAppDate: string | null;
+  // PG 결제 정보 (now moved to transactions)
+  transactions: {
+    id: string;
+    amount: number;
+    method: string;
+    status: string;
+    pgTid: string | null;
+    pgAppNo: string | null;
+    cardCompanyName: string | null;
+    pgAppDate: string | null;
+    cancelAmount: number;
+  }[];
   
+  isAbnormalCancel: boolean;
+  cancelReason: string | null;
+
   // 관리자 입력 필드
   installationDate: string | null;
   adminManager: string | null;
@@ -198,7 +209,14 @@ export default function AdminDashboard() {
       order.ordererName.toLowerCase().includes(searchLower) ||
       order.ordererPhone.includes(searchTerm);
     
-    const matchesStatus = filterStatus === "전체" || order.status === filterStatus;
+    let matchesStatus = false;
+    if (filterStatus === "전체") {
+      matchesStatus = true;
+    } else if (filterStatus === "비정상 취소") {
+      matchesStatus = order.isAbnormalCancel === true;
+    } else {
+      matchesStatus = order.status === filterStatus;
+    }
     
     return matchesSearch && matchesStatus;
   });
@@ -207,7 +225,7 @@ export default function AdminDashboard() {
     const headers = [
       "주문일시", "주문번호", "주문자명", "연락처", "사업자명", "사업자등록번호", 
       "배송지주소", "배송상세주소", "상품명", "수량", "할부기간", "월할부금", "총결제금액", 
-      "요청사항", "상태", "TID", "결제수단", "설치일정", "담당자명", "관리자메모"
+      "요청사항", "상태", "비정상취소여부", "취소사유", "결제내역", "설치일정", "담당자명", "관리자메모"
     ];
     
     const csvContent = [
@@ -228,8 +246,9 @@ export default function AdminDashboard() {
         order.totalAmount,
         `"${(order.requestNotes || '').replace(/"/g, '""')}"`,
         `"${order.status}"`,
-        `"${order.pgTid || ''}"`,
-        `"${order.pgMethod || ''}"`,
+        `"${order.isAbnormalCancel ? 'Y' : 'N'}"`,
+        `"${(order.cancelReason || '').replace(/"/g, '""')}"`,
+        `"${(order.transactions || []).map(t => `${t.method}(${t.amount}):${t.status}`).join(" / ")}"`,
         `"${order.installationDate || ''}"`,
         `"${order.adminManager || ''}"`,
         `"${(order.adminNotes || '').replace(/"/g, '""')}"`
@@ -301,10 +320,12 @@ export default function AdminDashboard() {
               >
                 <option value="전체">전체 상태</option>
                 <option value="결제 대기">결제 대기</option>
-                <option value="결제 완료">결제 완료</option>
+                <option value="PARTIALLY_PAID">부분 결제</option>
+                <option value="PAID">결제 완료</option>
+                <option value="결제 취소">결제 취소</option>
+                <option value="비정상 취소">비정상 취소(이탈/타임아웃)</option>
                 <option value="일정 확정">일정 확정</option>
                 <option value="설치 완료">설치 완료</option>
-                <option value="결제 취소">결제 취소</option>
               </select>
               <input 
                 type="text"
@@ -427,31 +448,41 @@ export default function AdminDashboard() {
                                   <div className="mt-6">
                                     <div className="flex justify-between items-center mb-2">
                                       <h5 className="font-bold text-sm text-gray-700">PG 결제 정보</h5>
-                                      {order.pgTid && (
-                                        <a 
-                                          href={`https://admin8.kcp.co.kr/assist/bill.BillActionNew.do?cmd=card_bill&tno=${order.pgTid}&order_no=${order.orderNumber}&trade_mony=${order.totalAmount}`}
-                                          target="_blank" 
-                                          rel="noopener noreferrer"
-                                          className="text-xs text-blue-600 hover:underline flex items-center gap-1"
-                                        >
-                                          <FileText className="w-3 h-3" />
-                                          매출전표 출력
-                                        </a>
-                                      )}
                                     </div>
-                                    <div className="bg-gray-50 p-3 rounded-lg space-y-2 text-xs">
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-500">거래번호(TID)</span>
-                                        <span>{order.pgTid || "-"}</span>
+                                    
+                                    {order.isAbnormalCancel && (
+                                      <div className="mb-4 bg-red-50 text-red-700 p-3 rounded-lg border border-red-200 text-sm font-bold flex items-center gap-2">
+                                        비정상 취소 (사유: {order.cancelReason})
                                       </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-500">결제수단</span>
-                                        <span>{order.pgMethod || "-"}</span>
-                                      </div>
-                                      <div className="flex justify-between">
-                                        <span className="text-gray-500">승인일시</span>
-                                        <span>{order.pgAppDate || "-"}</span>
-                                      </div>
+                                    )}
+
+                                    <div className="space-y-3">
+                                      {order.transactions && order.transactions.length > 0 ? (
+                                        order.transactions.map((tx: any, index: number) => (
+                                          <div key={tx.id} className="bg-gray-50 p-3 rounded-lg border border-gray-100 text-xs relative">
+                                            <div className="font-bold mb-2 pb-2 border-b border-gray-200 flex justify-between">
+                                              <span>결제 #{index + 1} ({tx.method === 'CARD' ? '신용카드' : '가상계좌'})</span>
+                                              <span className={`px-2 py-0.5 rounded text-[10px] ${
+                                                tx.status === 'SUCCESS' ? 'bg-green-100 text-green-700' :
+                                                tx.status === 'CANCELLED' ? 'bg-red-100 text-red-700' : 'bg-yellow-100 text-yellow-700'
+                                              }`}>
+                                                {tx.status}
+                                              </span>
+                                            </div>
+                                            <div className="space-y-1">
+                                              <div className="flex justify-between"><span className="text-gray-500">결제금액</span><span className="font-bold">{tx.amount.toLocaleString()}원</span></div>
+                                              <div className="flex justify-between"><span className="text-gray-500">승인일시</span><span>{tx.pgAppDate ? new Date(tx.pgAppDate).toLocaleString() : '-'}</span></div>
+                                              <div className="flex justify-between"><span className="text-gray-500">승인번호</span><span>{tx.pgAppNo || '-'}</span></div>
+                                              <div className="flex justify-between"><span className="text-gray-500">TID</span><span>{tx.pgTid || '-'}</span></div>
+                                              {tx.cancelAmount > 0 && (
+                                                <div className="flex justify-between text-red-500"><span className="text-gray-500">취소금액</span><span>{tx.cancelAmount.toLocaleString()}원</span></div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        ))
+                                      ) : (
+                                        <div className="text-center p-4 bg-gray-50 text-gray-400 text-xs rounded-lg">결제 내역이 없습니다.</div>
+                                      )}
                                     </div>
                                   </div>
                                 </div>

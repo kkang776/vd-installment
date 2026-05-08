@@ -8,8 +8,9 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
-  url      = env("DATABASE_URL")
+  provider = "postgresql"
+  url      = env("POSTGRES_PRISMA_URL")
+  directUrl = env("POSTGRES_URL_NON_POOLING")
 }
 
 model Admin {
@@ -38,12 +39,13 @@ model Order {
   monthlyFee        Int
   totalAmount       Int
   
-  status            String   @default("PENDING")
-  paymentId         String?
+  status            String   @default("PENDING") // PENDING, PARTIALLY_PAID, PAID, CANCELLED, ABNORMAL_CANCELLED
   
-  pgTid             String?
-  pgMethod          String?
-  pgAppDate         String?
+  paymentExpiresAt  DateTime?
+  isAbnormalCancel  Boolean   @default(false)
+  cancelReason      String?
+  
+  transactions      PaymentTransaction[]
   
   installationDate  String?
   adminManager      String?
@@ -51,4 +53,38 @@ model Order {
   
   createdAt         DateTime @default(now())
   updatedAt         DateTime @updatedAt
+}
+
+model PaymentTransaction {
+  id              String   @id @default(cuid())
+  orderId         String
+  order           Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  amount          Int
+  method          String   // "CARD", "VIRTUAL_ACCOUNT"
+  status          String   @default("PENDING") // PENDING, SUCCESS, FAILED, CANCELLED
+  
+  pgTid           String?
+  pgAppDate       String?
+  pgAppNo         String?
+  cardCompanyName String?
+  quota           Int?
+  
+  cancelAmount    Int      @default(0)
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+}
+
+model NotificationLog {
+  id              String   @id @default(cuid())
+  orderId         String?
+  type            String   @default("ALIMTALK")
+  recipientNum    String
+  templateCode    String?
+  payload         String?
+  isSuccess       Boolean
+  errorCode       String?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
 }
