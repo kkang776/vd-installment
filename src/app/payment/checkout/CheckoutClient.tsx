@@ -7,10 +7,15 @@ type Order = any;
 
 // 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
-  { code: "CCLO", kcpCode: "71", name: "롯데카드" },
-  { code: "CCDI", kcpCode: "61", name: "현대카드" },
-  { code: "CCHN", kcpCode: "21", name: "하나카드" },
+  { code: "CCBC", kcpCode: "31", name: "BC카드" },
+  { code: "CCKB", kcpCode: "11", name: "KB국민카드" },
+  { code: "CCSF", kcpCode: "51", name: "삼성카드" },
   { code: "CCLG", kcpCode: "41", name: "신한카드" },
+  { code: "CCDI", kcpCode: "61", name: "현대카드" },
+  { code: "CCLO", kcpCode: "71", name: "롯데카드" },
+  { code: "CCHN", kcpCode: "21", name: "하나카드" },
+  { code: "CCSG", kcpCode: "91", name: "NH농협카드" },
+  { code: "CCWR", kcpCode: "33", name: "우리카드" },
 ];
 
 // 천단위 콤마 포맷
