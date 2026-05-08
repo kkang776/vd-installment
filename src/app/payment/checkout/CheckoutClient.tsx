@@ -197,9 +197,33 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         }
 
         if (isMobile) {
-          // Mobile: Direct form submission to KCP mobile payment page (no register.do needed)
-          kcpForm.action = "https://testsmpay.kcp.co.kr/pay/mobileGW.kcp";
-          kcpForm.submit();
+          // Mobile: Call Edge Runtime function to register trade (bypasses Node.js IP block)
+          try {
+            const regRes = await fetch("/api/payment/kcp-register", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                site_cd: (document.getElementById("order_info") as HTMLFormElement)?.querySelector<HTMLInputElement>("[name=site_cd]")?.value || "T0000",
+                ordr_idxx: data.transactionId,
+                good_mny: pendingRow.amount.toString(),
+                good_name: order.productName,
+                pay_method: pendingRow.method === "CARD" ? "CARD" : "VCNT",
+                Ret_URL: `${origin}/api/payment/split-callback`,
+              }),
+            });
+            const regData = await regRes.json();
+            if (!regData.success) {
+              alert("모바일 결제 등록 실패: " + regData.error);
+              setIsProcessing(false);
+              return;
+            }
+            (document.getElementById("approval_key") as HTMLInputElement).value = regData.approvalKey;
+            kcpForm.action = regData.PayUrl;
+            kcpForm.submit();
+          } catch (regError: any) {
+            alert("모바일 결제 연결 실패: " + regError.message);
+            setIsProcessing(false);
+          }
         } else {
           // PC: Use KCP JS SDK popup
           (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
