@@ -42,18 +42,11 @@ export async function POST(request: Request) {
         const kcpOrderNo = transaction.id.toUpperCase();
         const tradeRegData = {
           site_cd,
-          req_tx: "pay",
           ordr_idxx: kcpOrderNo,
           good_mny: amount.toString(),
           good_name: order.productName,
           pay_method: method === "CARD" ? "CARD" : "VCNT",
-          currency: "410",
-          shop_name: "브이디로보틱스",
-          buyr_name: order.ordererName,
-          buyr_tel1: order.ordererPhone,
-          buyr_mail: "customer@vdrobotics.co.kr",
           Ret_URL: `${baseUrl}/api/payment/split-callback`,
-          encoding_trans: "UTF-8",
         };
 
         console.log("KCP Trade Reg Target URL:", process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl);
