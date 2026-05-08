@@ -127,8 +127,11 @@ export async function POST(request: Request) {
       approval_key,
       PayUrl,
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Order creation error:", error);
-    return NextResponse.json({ success: false, error: "Failed to create order" }, { status: 500 });
+    return NextResponse.json({ 
+      success: false, 
+      error: `Failed to create order: ${error.message || error}` 
+    }, { status: 500 });
   }
 }
