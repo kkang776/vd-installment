@@ -64,9 +64,16 @@ async function handleCallback(req: Request) {
       });
     }
 
-    const transaction = await prisma.paymentTransaction.findUnique({
-      where: { id: ordr_idxx },
+    // Find transaction by KCP order number (stored in pgAppNo) or by ID (fallback)
+    let transaction = await prisma.paymentTransaction.findFirst({
+      where: { pgAppNo: ordr_idxx },
     });
+    if (!transaction) {
+      // Fallback: try finding by ID (for backward compatibility)
+      transaction = await prisma.paymentTransaction.findUnique({
+        where: { id: ordr_idxx },
+      });
+    }
 
     if (!transaction) {
       return new NextResponse(`

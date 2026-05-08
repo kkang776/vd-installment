@@ -12,7 +12,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Order not found" });
     }
 
-    // Create a pending transaction
+    // Generate KCP-friendly order number (alphanumeric, short, unique)
+    const kcpOrderNo = `${order.orderNumber.replace(/[^A-Z0-9]/gi, "")}_${Date.now().toString(36).toUpperCase()}`;
+
+    // Create a pending transaction with pgAppNo storing the KCP order number
     const transaction = await prisma.paymentTransaction.create({
       data: {
         orderId,
@@ -20,6 +23,7 @@ export async function POST(request: Request) {
         method,
         status: "PENDING",
         cardCompanyName: cardCompanyName || null,
+        pgAppNo: kcpOrderNo, // Store KCP order number for callback matching
       }
     });
 
@@ -29,7 +33,7 @@ export async function POST(request: Request) {
     // KCP Mobile Trade Registration
     if (isMobile) {
       try {
-        const protocol = request.headers.get("x-forwarded-proto") || "http";
+        const protocol = request.headers.get("x-forwarded-proto") || "https";
         const host = request.headers.get("host");
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
 
@@ -39,30 +43,27 @@ export async function POST(request: Request) {
           ? "https://testsmpay.kcp.co.kr/trade/register.do" 
           : "https://smpay.kcp.co.kr/trade/register.do";
 
-        const kcpOrderNo = transaction.id.toUpperCase();
-        const tradeRegData = {
-          site_cd,
-          ordr_idxx: kcpOrderNo,
-          good_mny: amount.toString(),
-          good_name: order.productName,
-          pay_method: method === "CARD" ? "CARD" : "VCNT",
-          Ret_URL: `${baseUrl}/api/payment/split-callback`,
-        };
+        // Use URLSearchParams with .append() - matching old working pattern
+        const tradeRegParams = new URLSearchParams();
+        tradeRegParams.append("site_cd", site_cd);
+        tradeRegParams.append("ordr_idxx", kcpOrderNo);
+        tradeRegParams.append("good_mny", amount.toString());
+        tradeRegParams.append("good_name", order.productName);
+        tradeRegParams.append("pay_method", method === "CARD" ? "CARD" : "VCNT");
+        tradeRegParams.append("Ret_URL", `${baseUrl}/api/payment/split-callback`);
 
-        console.log("KCP Trade Reg Target URL:", process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl);
-        console.log("KCP Trade Reg Request Body:", tradeRegData);
+        const targetUrl = process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl;
+        console.log("KCP Trade Reg URL:", targetUrl);
+        console.log("KCP Trade Reg Params:", Object.fromEntries(tradeRegParams.entries()));
 
-        const tradeRegRes = await fetch(
-          process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: new URLSearchParams(tradeRegData as any).toString(),
-          }
-        );
+        const tradeRegRes = await fetch(targetUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          body: tradeRegParams.toString(),
+        });
 
         const rawResText = await tradeRegRes.text();
-        console.log("KCP Trade Reg Raw Response:", rawResText);
+        console.log("KCP Trade Reg Response:", rawResText);
 
         let tradeRegResult: any = {};
         try {
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
           console.error("KCP Response JSON Parse Error:", parseError);
           return NextResponse.json({
             success: false,
-            error: `KCP 응답 해석 실패 (JSON 파싱 오류): ${rawResText}`,
+            error: `KCP 응답 파싱 실패: ${rawResText.substring(0, 200)}`,
           });
         }
 
@@ -83,8 +84,8 @@ export async function POST(request: Request) {
             success: false,
             error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message || "상세 사유 없음"}`,
             debug: {
-              url: process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl,
-              request: tradeRegData,
+              url: targetUrl,
+              request: Object.fromEntries(tradeRegParams.entries()),
               response: tradeRegResult
             }
           });
@@ -98,6 +99,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       success: true,
       transactionId: transaction.id,
+      kcpOrderNo,
       approval_key,
       PayUrl,
     });

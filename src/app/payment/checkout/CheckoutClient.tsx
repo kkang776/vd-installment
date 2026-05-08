@@ -189,7 +189,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       if (kcpForm) {
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
         (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "100000000000" : "001000000000";
-        (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.transactionId.toUpperCase();
+        (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
         (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
         // Set card company restriction using KCP English code (CCXX)
