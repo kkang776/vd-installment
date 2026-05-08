@@ -198,7 +198,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
         if (isMobile) {
           // Mobile: Direct form submission to KCP mobile payment page (no register.do needed)
-          kcpForm.action = "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp";
+          kcpForm.action = "https://testsmpay.kcp.co.kr/pay/mobileGW.kcp";
           kcpForm.submit();
         } else {
           // PC: Use KCP JS SDK popup
