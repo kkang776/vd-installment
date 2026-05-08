@@ -39,14 +39,18 @@ export async function POST(request: Request) {
           ? "https://testsmpay.kcp.co.kr/trade/register.do" 
           : "https://smpay.kcp.co.kr/trade/register.do";
 
+        const kcpOrderNo = transaction.id.toUpperCase();
         const tradeRegData = {
           site_cd,
-          ordr_idxx: transaction.id, // Using transaction ID for KCP to track split payments
+          ordr_idxx: kcpOrderNo,
           good_mny: amount.toString(),
           good_name: order.productName,
           pay_method: method === "CARD" ? "CARD" : "VCNT",
           Ret_URL: `${baseUrl}/api/payment/split-callback`,
         };
+
+        console.log("KCP Trade Reg Target URL:", process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl);
+        console.log("KCP Trade Reg Request Body:", tradeRegData);
 
         const tradeRegRes = await fetch(
           process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl,
@@ -58,7 +62,18 @@ export async function POST(request: Request) {
         );
 
         const rawResText = await tradeRegRes.text();
-        const tradeRegResult = JSON.parse(rawResText);
+        console.log("KCP Trade Reg Raw Response:", rawResText);
+
+        let tradeRegResult: any = {};
+        try {
+          tradeRegResult = JSON.parse(rawResText);
+        } catch (parseError) {
+          console.error("KCP Response JSON Parse Error:", parseError);
+          return NextResponse.json({
+            success: false,
+            error: `KCP 응답 해석 실패 (JSON 파싱 오류): ${rawResText}`,
+          });
+        }
 
         if (tradeRegResult.Code === "0000") {
           approval_key = tradeRegResult.approvalKey;
@@ -66,11 +81,17 @@ export async function POST(request: Request) {
         } else {
           return NextResponse.json({
             success: false,
-            error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message}`,
+            error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message || "상세 사유 없음"}`,
+            debug: {
+              url: process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl,
+              request: tradeRegData,
+              response: tradeRegResult
+            }
           });
         }
       } catch (e: any) {
-        return NextResponse.json({ success: false, error: `KCP 서버 통신 오류: ${e.message}` });
+        console.error("KCP connection exception:", e);
+        return NextResponse.json({ success: false, error: `KCP 서버 연결 실패: ${e.message}` });
       }
     }
 
