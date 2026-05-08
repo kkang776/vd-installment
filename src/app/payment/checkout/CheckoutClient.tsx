@@ -170,7 +170,14 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       });
       const data = await res.json();
       if (!data.success) {
-        alert("결제 요청 실패: " + data.error);
+        let errorMsg = "결제 요청 실패: " + data.error;
+        if (data.debug) {
+          errorMsg += "\n\n[디버그 정보]";
+          errorMsg += "\nURL: " + data.debug.url;
+          errorMsg += "\nRequest: " + JSON.stringify(data.debug.request);
+          errorMsg += "\nResponse: " + JSON.stringify(data.debug.response);
+        }
+        alert(errorMsg);
         setIsProcessing(false);
         return;
       }
