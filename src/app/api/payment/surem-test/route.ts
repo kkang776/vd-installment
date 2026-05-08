@@ -4,7 +4,7 @@ export const dynamic = "force-dynamic";
 
 // Test endpoint to verify SureM Alimtalk API connectivity
 export async function GET(request: Request) {
-  const accessToken = process.env.SUREM_USER_CODE;
+  const accessToken = process.env.SUREM_ACCESS_TOKEN || process.env.SUREM_USER_CODE;
   const senderKey = process.env.SUREM_PROFILE_KEY;
   const templateCode = process.env.SUREM_TEMPLATE_CODE;
   const reqPhone = (process.env.SUREM_SENDER_NUM || "").replace(/-/g, "");

@@ -15,7 +15,7 @@ interface AlimtalkPayload {
  * Auth: Bearer {SUREM_USER_CODE}
  */
 export async function sendAlimtalk(payload: AlimtalkPayload) {
-  const accessToken = process.env.SUREM_USER_CODE; // kdpotp
+  const accessToken = process.env.SUREM_ACCESS_TOKEN || process.env.SUREM_USER_CODE; // Bearer 인증 토큰
   const senderKey = process.env.SUREM_PROFILE_KEY; // 카카오 발신프로필 키
   const templateCode = process.env.SUREM_TEMPLATE_CODE; // scpay_01
   const reqPhone = (process.env.SUREM_SENDER_NUM || "").replace(/-/g, ""); // 18333482
