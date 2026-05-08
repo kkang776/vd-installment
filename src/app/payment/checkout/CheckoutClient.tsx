@@ -196,46 +196,51 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
         }
 
-        // Use KCP JS SDK for both PC and mobile (avoids server-side register.do call)
-        (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
-          const formData = new FormData(form);
-          const res_cd = formData.get("res_cd");
-          const res_msg = formData.get("res_msg");
-          
-          if (res_cd !== "0000") {
-            if (typeof closeEvent === "function") closeEvent();
-            alert("결제가 취소되었거나 실패했습니다: " + res_msg);
-            setIsProcessing(false);
-            try {
-              await fetch("/api/payment/split-callback", { method: "POST", body: formData });
-            } catch (e) {}
-            return;
-          }
-
-          // Success
-          try {
-            if (typeof closeEvent === "function") closeEvent();
-            setIsVerifying(true);
-            const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
-            if (res.ok) {
-              await fetchUpdatedOrder();
-            } else {
-              alert("결제 검증에 실패했습니다.");
+        if (isMobile) {
+          // Mobile: Direct form submission to KCP mobile payment page (no register.do needed)
+          kcpForm.action = "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp";
+          kcpForm.submit();
+        } else {
+          // PC: Use KCP JS SDK popup
+          (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
+            const formData = new FormData(form);
+            const res_cd = formData.get("res_cd");
+            const res_msg = formData.get("res_msg");
+            
+            if (res_cd !== "0000") {
+              if (typeof closeEvent === "function") closeEvent();
+              alert("결제가 취소되었거나 실패했습니다: " + res_msg);
+              setIsProcessing(false);
+              try {
+                await fetch("/api/payment/split-callback", { method: "POST", body: formData });
+              } catch (e) {}
+              return;
             }
-          } catch (e) {
-            alert("결제 처리 중 오류가 발생했습니다.");
-          } finally {
-            setIsProcessing(false);
-            setIsVerifying(false);
-          }
-        };
 
-        // Execute KCP payment (JS SDK handles both PC popup and mobile)
-        try {
-          (window as any).KCP_Pay_Execute_Web(kcpForm);
-        } catch (kcpError) {
-          console.log("KCP payment error:", kcpError);
-          setIsProcessing(false);
+            // Success
+            try {
+              if (typeof closeEvent === "function") closeEvent();
+              setIsVerifying(true);
+              const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
+              if (res.ok) {
+                await fetchUpdatedOrder();
+              } else {
+                alert("결제 검증에 실패했습니다.");
+              }
+            } catch (e) {
+              alert("결제 처리 중 오류가 발생했습니다.");
+            } finally {
+              setIsProcessing(false);
+              setIsVerifying(false);
+            }
+          };
+
+          try {
+            (window as any).KCP_Pay_Execute_Web(kcpForm);
+          } catch (kcpError) {
+            console.log("KCP popup error:", kcpError);
+            setIsProcessing(false);
+          }
         }
       }
     } catch (e) {
