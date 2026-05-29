@@ -8,14 +8,10 @@ type Order = any;
 // 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
   { code: "CCBC", kcpCode: "31", name: "BC카드" },
-  { code: "CCKB", kcpCode: "11", name: "KB국민카드" },
-  { code: "CCSF", kcpCode: "51", name: "삼성카드" },
-  { code: "CCLG", kcpCode: "41", name: "신한카드" },
-  { code: "CCDI", kcpCode: "61", name: "현대카드" },
   { code: "CCLO", kcpCode: "71", name: "롯데카드" },
-  { code: "CCHN", kcpCode: "21", name: "하나카드" },
-  { code: "CCSG", kcpCode: "91", name: "NH농협카드" },
   { code: "CCWR", kcpCode: "33", name: "우리카드" },
+  { code: "CCKB", kcpCode: "11", name: "KB국민카드" },
+  { code: "CCHN", kcpCode: "21", name: "하나카드" },
 ];
 
 // 천단위 콤마 포맷
@@ -45,7 +41,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     const dbRemaining = initialOrder.totalAmount - dbPaid;
     const successRows = dbSuccess.map((t: any) => ({ ...t, id: t.id }));
     if (dbRemaining > 0) {
-      return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }];
+      return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCBC", kcpCode: "31", cardName: "BC카드", quota: 36, status: "PENDING" }];
     }
     return successRows;
   });
@@ -139,7 +135,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       return;
     }
     const newAmount = totalAmount - currentTotal;
-    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
+    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCBC", kcpCode: "31", cardName: "BC카드", quota: 36, status: "PENDING" }]);
   };
 
   const removeRow = (id: number) => {
@@ -385,13 +381,10 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
                         <select
                           value={row.method}
                           onChange={(e) => updateRow(row.id, "method", e.target.value)}
-                          disabled
-                          className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-gray-50 text-gray-500 text-sm font-medium cursor-not-allowed"
+                          className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
                         >
                           <option value="CARD">신용카드</option>
-                          {/* PG 심사를 위해 가상계좌 옵션 일시 숨김
                           <option value="VIRTUAL_ACCOUNT">가상계좌</option>
-                          */}
                         </select>
                       </div>
 
@@ -430,31 +423,33 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
                       )}
                     </div>
 
-                    {/* Row 2: 금액 입력 (PG 심사를 위해 총 결제 금액 고정 및 비활성화) */}
+                    {/* Row 2: 금액 입력 */}
                     <div>
                       <label className="block text-xs font-medium text-gray-500 mb-1">결제 금액</label>
                       <div className="relative">
                         <input
                           type="text"
                           value={row.amount ? formatNumber(row.amount) : ''}
-                          disabled
-                          readOnly
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none bg-gray-50 text-gray-500 cursor-not-allowed pr-12 text-right font-bold text-lg"
+                          onChange={(e) => {
+                            const raw = parseFormattedNumber(e.target.value);
+                            updateRow(row.id, "amount", raw);
+                          }}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 pr-12 text-right font-bold text-lg"
                           placeholder="금액 입력"
                         />
                         <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">원</span>
                       </div>
                     </div>
 
-                    {/* PG 심사를 위해 금액 조절 퀵 버튼 일시 숨김 */}
-                    {/* <div className="flex flex-wrap gap-2">
+                    {/* Row 3: Quick Buttons */}
+                    <div className="flex flex-wrap gap-2">
                       <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 1000000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+100만</button>
                       <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 100000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+10만</button>
                       <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 1000000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-100만</button>
                       <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 100000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-10만</button>
                       <button type="button" onClick={() => updateRow(row.id, "amount", remainingAmount)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg transition-colors">전액</button>
                       <button type="button" onClick={() => updateRow(row.id, "amount", 0)} className="px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm font-medium rounded-lg transition-colors">초기화</button>
-                    </div> */}
+                    </div>
                   </div>
                 )}
 
@@ -463,15 +458,14 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           ))}
         </div>
 
-        {/* PG 심사 통과를 위해 분할결제 추가 버튼 일시 숨김 (Feature Toggle) */}
-        {/* {paidAmount < totalAmount && (
+        {paidAmount < totalAmount && (
           <button
             onClick={addRow}
             className="mt-4 w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-xl hover:border-red-500 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
           >
             <Plus className="w-5 h-5" /> 분할결제 추가하기
           </button>
-        )} */}
+        )}
 
         <div className="mt-8 pt-8 border-t border-gray-100">
           <button
