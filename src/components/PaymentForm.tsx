@@ -15,12 +15,12 @@ const PRODUCTS = [
     detailImageUrl: "/a1.jpg",
   },
   {
-    id: "cleaver-sh1",
-    name: "클리버 SH1",
-    monthlyPrice: 273900,
+    id: "cleaver-a1-lite",
+    name: "클리버 A1 Lite",
+    monthlyPrice: 185900,
     contractMonths: 36,
-    imageUrl: "/sh1_image.jpg",
-    detailImageUrl: "/sh1.jpg",
+    imageUrl: "/A1_image.jpg",
+    detailImageUrl: "",
   },
 ];
 
@@ -39,7 +39,6 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
     termsAgreed: false,
   });
 
-  const [businessRegCertFile, setBusinessRegCertFile] = useState<File | null>(null);
   const [selectedProductId, setSelectedProductId] = useState(PRODUCTS[0].id);
   const [quantity, setQuantity] = useState(1);
   const [contractMonths, setContractMonths] = useState(36);
@@ -56,7 +55,6 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
       requestNotes: "",
       termsAgreed: false,
     });
-    setBusinessRegCertFile(null);
     setQuantity(1);
     setSelectedProductId(PRODUCTS[0].id);
   };
@@ -83,11 +81,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
     }));
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      setBusinessRegCertFile(e.target.files[0]);
-    }
-  };
+
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const open = useDaumPostcodePopup();
@@ -135,9 +129,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
       data.append("monthlyFee", selectedProduct.monthlyPrice.toString());
       data.append("totalAmount", totalPaymentPrice.toString());
 
-      if (businessRegCertFile) {
-        data.append("businessRegCertFile", businessRegCertFile);
-      }
+
       data.append("isMobile", isMobile.toString());
 
       const res = await fetch("/api/orders", {
@@ -201,11 +193,11 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
           {/* 02. 사업자 정보 */}
           <section className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
             <h3 className="text-lg font-bold flex items-center gap-2 mb-6">
-              <Building2 className="text-red-500 w-5 h-5" /> 02. 사업자 정보 <span className="text-sm font-normal text-gray-400 ml-1">(선택)</span>
+              <Building2 className="text-red-500 w-5 h-5" /> 02. 사업자 정보
             </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">사업자명</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">사업자명 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   name="businessName"
@@ -213,10 +205,11 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-colors"
                   placeholder="사업자명을 입력해 주세요."
+                  required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">사업자등록번호</label>
+                <label className="block text-sm font-medium text-gray-700 mb-2">사업자등록번호 <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   name="businessRegNumber"
@@ -224,24 +217,8 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                   onChange={handleInputChange}
                   className="w-full px-4 py-3 rounded-lg border border-gray-300 focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-colors"
                   placeholder="'-' 없이 숫자만 입력해 주세요."
+                  required
                 />
-              </div>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">사업자등록증 첨부</label>
-              <div className="flex items-center gap-4">
-                <label className="flex items-center justify-center gap-2 px-4 py-3 border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors w-full bg-white">
-                  <Upload className="w-5 h-5 text-gray-500" />
-                  <span className="text-sm text-gray-600">
-                    {businessRegCertFile ? businessRegCertFile.name : "파일 선택"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*,.pdf"
-                    className="hidden"
-                    onChange={handleFileChange}
-                  />
-                </label>
               </div>
             </div>
           </section>
@@ -369,17 +346,19 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                         <div className="text-red-500 font-bold text-xs sm:text-sm">월 {product.monthlyPrice.toLocaleString()}원</div>
                         <div className="text-[10px] text-gray-400">36개월 무이자</div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          onOpenProductDetail(product.detailImageUrl);
-                        }}
-                        className="p-1 sm:p-2 text-gray-400 hover:text-gray-600"
-                      >
-                        <Search className="w-4 h-4" />
-                      </button>
+                      {product.detailImageUrl && (
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            onOpenProductDetail(product.detailImageUrl);
+                          }}
+                          className="p-1 sm:p-2 text-gray-400 hover:text-gray-600"
+                        >
+                          <Search className="w-4 h-4" />
+                        </button>
+                      )}
                     </label>
                   ))}
                 </div>
@@ -451,7 +430,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                   <div className="space-y-2 text-[11px] sm:text-xs text-red-500 font-bold">
                     <div className="flex items-start gap-2">
                       <span className="shrink-0">(1) 결제가능 카드사 :</span>
-                      <span className="text-gray-600 font-medium">롯데 / 현대 / 하나 / 신한</span>
+                      <span className="text-gray-600 font-medium">비씨 / 롯데 / 우리 / 국민 / 하나</span>
                     </div>
                     <div className="flex items-start gap-2">
                       <span className="shrink-0">(2) 법인카드 결제 불가</span>

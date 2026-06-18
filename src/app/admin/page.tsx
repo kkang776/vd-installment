@@ -305,10 +305,8 @@ export default function AdminDashboard() {
                     defaultValue=""
                   >
                     <option value="" disabled>일괄 상태 변경</option>
-                    <option value="결제 대기">결제 대기</option>
                     <option value="결제 완료">결제 완료</option>
-                    <option value="일정 확정">일정 확정</option>
-                    <option value="설치 완료">설치 완료</option>
+                    <option value="결제 취소">결제 취소</option>
                   </select>
                 </div>
               )}
@@ -319,13 +317,8 @@ export default function AdminDashboard() {
                 className="border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
               >
                 <option value="전체">전체 상태</option>
-                <option value="결제 대기">결제 대기</option>
-                <option value="PARTIALLY_PAID">부분 결제</option>
-                <option value="PAID">결제 완료</option>
+                <option value="결제 완료">결제 완료</option>
                 <option value="결제 취소">결제 취소</option>
-                <option value="비정상 취소">비정상 취소(이탈/타임아웃)</option>
-                <option value="일정 확정">일정 확정</option>
-                <option value="설치 완료">설치 완료</option>
               </select>
               <input 
                 type="text"
@@ -392,7 +385,6 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 font-bold text-red-500 whitespace-nowrap">{order.totalAmount.toLocaleString()}원</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                            order.status === "결제 대기" ? "bg-yellow-100 text-yellow-700" :
                             order.status === "결제 완료" ? "bg-green-100 text-green-700" :
                             order.status === "결제 취소" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
                           }`}>
@@ -503,10 +495,7 @@ export default function AdminDashboard() {
                                       onChange={(e) => setEditForm({...editForm, status: e.target.value})}
                                       className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
                                     >
-                                      <option value="결제 대기">결제 대기</option>
                                       <option value="결제 완료">결제 완료</option>
-                                      <option value="일정 확정">일정 확정</option>
-                                      <option value="설치 완료">설치 완료</option>
                                       <option value="결제 취소">결제 취소</option>
                                     </select>
                                   </div>

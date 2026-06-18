@@ -22,6 +22,11 @@ export async function GET() {
     }
 
     const orders = await prisma.order.findMany({
+      where: {
+        status: {
+          not: "결제 대기",
+        },
+      },
       orderBy: { createdAt: "desc" },
       include: { transactions: true },
     });
