@@ -42,6 +42,7 @@ async function handleCallback(req: Request) {
     const tno = params["tno"] || null;
     const app_no = params["app_no"] || null;
     const card_name = params["card_name"] || null;
+    const quotaParam = params["quota"] || null;
 
     // If no transaction ID, redirect back to home gracefully
     if (!ordr_idxx) {
@@ -123,6 +124,8 @@ async function handleCallback(req: Request) {
     const resolvedTno = tno || ("T" + Date.now().toString());
     const resolvedAppNo = app_no || Math.floor(10000000 + Math.random() * 90000000).toString();
 
+    const resolvedQuota = quotaParam ? parseInt(quotaParam, 10) : null;
+
     await prisma.paymentTransaction.update({
       where: { id: transaction.id },
       data: {
@@ -130,6 +133,7 @@ async function handleCallback(req: Request) {
         pgTid: resolvedTno,
         pgAppNo: resolvedAppNo,
         cardCompanyName: resolvedCardName,
+        quota: resolvedQuota,
         pgAppDate: new Date().toISOString(),
       },
     });

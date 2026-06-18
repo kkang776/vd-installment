@@ -32,6 +32,7 @@ type Order = {
     pgTid: string | null;
     pgAppNo: string | null;
     cardCompanyName: string | null;
+    quota: number | null;
     pgAppDate: string | null;
     cancelAmount: number;
   }[];
@@ -463,6 +464,12 @@ export default function AdminDashboard() {
                                             </div>
                                             <div className="space-y-1">
                                               <div className="flex justify-between"><span className="text-gray-500">결제금액</span><span className="font-bold">{tx.amount.toLocaleString()}원</span></div>
+                                              {tx.method === 'CARD' && (
+                                                <>
+                                                  <div className="flex justify-between"><span className="text-gray-500">카드사</span><span>{tx.cardCompanyName || '-'}</span></div>
+                                                  <div className="flex justify-between"><span className="text-gray-500">할부기간</span><span>{tx.quota === 0 ? "일시불" : tx.quota ? `${tx.quota}개월` : '-'}</span></div>
+                                                </>
+                                              )}
                                               <div className="flex justify-between"><span className="text-gray-500">승인일시</span><span>{tx.pgAppDate ? new Date(tx.pgAppDate).toLocaleString() : '-'}</span></div>
                                               <div className="flex justify-between"><span className="text-gray-500">승인번호</span><span>{tx.pgAppNo || '-'}</span></div>
                                               <div className="flex justify-between"><span className="text-gray-500">TID</span><span>{tx.pgTid || '-'}</span></div>
@@ -499,26 +506,7 @@ export default function AdminDashboard() {
                                       <option value="결제 취소">결제 취소</option>
                                     </select>
                                   </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">설치 일정</label>
-                                    <input 
-                                      type="text"
-                                      value={editForm.installationDate}
-                                      onChange={(e) => setEditForm({...editForm, installationDate: e.target.value})}
-                                      placeholder="예: 2026-05-15 오전"
-                                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                                    />
-                                  </div>
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">담당자명</label>
-                                    <input 
-                                      type="text"
-                                      value={editForm.adminManager}
-                                      onChange={(e) => setEditForm({...editForm, adminManager: e.target.value})}
-                                      placeholder="담당 엔지니어 이름"
-                                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                                    />
-                                  </div>
+
                                   <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">기타사항 (관리자 메모)</label>
                                     <textarea 
