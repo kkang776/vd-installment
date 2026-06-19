@@ -124,27 +124,84 @@ async function handleCallback(req: Request) {
       }
     }
 
-    // ── KCP 거래번호 필수 확인 ──
-    if (!tno) {
-      console.error("KCP tno(거래번호) 누락 — ordr_idxx:", ordr_idxx);
-      // 테스트 환경에서는 허용, 운영에서는 차단
+    let resolvedTno = tno;
+    let resolvedAppNo = app_no;
+    let resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
+    let resolvedQuota = quotaParam ? parseInt(quotaParam, 10) : null;
+
+    // ── KCP 승인 요청 (enc_data가 있고 tno가 없는 경우) ──
+    const enc_data = params["enc_data"];
+    const enc_info = params["enc_info"];
+    const tran_cd = params["tran_cd"];
+    
+    if (!resolvedTno && enc_data) {
+      const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
+      const site_key = process.env.KCP_SITE_KEY;
+      
+      if (site_cd && site_key) {
+        try {
+          const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
+          const approveUrl = targetUrl.replace("/trade/register.do", "/trade/approve.do");
+          
+          const approveParams = new URLSearchParams();
+          approveParams.append("site_cd", site_cd);
+          approveParams.append("site_key", site_key);
+          approveParams.append("ordr_idxx", ordr_idxx);
+          approveParams.append("enc_data", enc_data);
+          approveParams.append("enc_info", enc_info || "");
+          if (tran_cd) approveParams.append("tran_cd", tran_cd);
+          approveParams.append("req_tx", "pay"); // 승인 요청
+          
+          console.log("KCP Approval Request:", approveUrl, approveParams.toString());
+          
+          const approveRes = await fetch(approveUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: approveParams.toString()
+          });
+          
+          const approveText = await approveRes.text();
+          console.log("KCP Approval Response:", approveText);
+          
+          let approveData: any = {};
+          try {
+            approveData = JSON.parse(approveText);
+          } catch {
+            const urlParams = new URLSearchParams(approveText);
+            approveData = Object.fromEntries(urlParams.entries());
+          }
+          
+          if (approveData.res_cd === "0000" || approveData.Code === "0000") {
+            resolvedTno = approveData.tno;
+            if (approveData.app_no) resolvedAppNo = approveData.app_no;
+            if (approveData.card_name) resolvedCardName = approveData.card_name;
+            if (approveData.quota) resolvedQuota = parseInt(approveData.quota, 10);
+          } else {
+            console.error("KCP Approval Failed:", approveData);
+          }
+        } catch (e) {
+          console.error("KCP Approval Network Error:", e);
+        }
+      }
+    }
+
+    // ── KCP 거래번호 최종 확인 ──
+    if (!resolvedTno) {
+      console.error("KCP tno(거래번호) 최종 수신 실패 — ordr_idxx:", ordr_idxx);
       if (process.env.NODE_ENV === "production") {
         await prisma.paymentTransaction.update({
           where: { id: transaction.id },
           data: { status: "FAILED" },
         });
         return htmlResponse(`
-          alert("결제 처리 중 오류가 발생했습니다. (거래번호 누락)");
+          alert("결제 승인 처리 중 오류가 발생했습니다. (거래번호 발급 실패)");
           if (window.opener) { window.opener.location.reload(); window.close(); }
           else { window.location.replace("/"); }
         `);
       }
+      resolvedTno = "DEV_" + Date.now().toString();
+      resolvedAppNo = "DEV_" + Math.floor(10000000 + Math.random() * 90000000).toString();
     }
-
-    const resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
-    const resolvedTno = tno || ("DEV_" + Date.now().toString());
-    const resolvedAppNo = app_no || ("DEV_" + Math.floor(10000000 + Math.random() * 90000000).toString());
-    const resolvedQuota = quotaParam ? parseInt(quotaParam, 10) : null;
 
     // ── Prisma 트랜잭션으로 원자적 업데이트 ──
     const { orderStatus, order } = await prisma.$transaction(async (tx) => {

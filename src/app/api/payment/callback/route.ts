@@ -64,7 +64,49 @@ async function handleCallback(req: Request) {
     // 3. KCP 응답 코드 확인
     const kcpResCd = res_cd || "0000";
     const kcpResMsg = res_msg || "정상처리";
-    const kcpTno = params["tno"] || null;
+    let kcpTno = params["tno"] || null;
+    
+    // ── KCP 승인 요청 (enc_data가 있고 tno가 없는 경우) ──
+    const enc_data = params["enc_data"];
+    const enc_info = params["enc_info"];
+    const tran_cd = params["tran_cd"];
+    
+    if (!kcpTno && enc_data) {
+      const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
+      const site_key = process.env.KCP_SITE_KEY;
+      if (site_cd && site_key) {
+        try {
+          const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
+          const approveUrl = targetUrl.replace("/trade/register.do", "/trade/approve.do");
+          
+          const approveParams = new URLSearchParams();
+          approveParams.append("site_cd", site_cd);
+          approveParams.append("site_key", site_key);
+          approveParams.append("ordr_idxx", ordr_idxx);
+          approveParams.append("enc_data", enc_data);
+          approveParams.append("enc_info", enc_info || "");
+          if (tran_cd) approveParams.append("tran_cd", tran_cd);
+          approveParams.append("req_tx", "pay");
+          
+          const approveRes = await fetch(approveUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: approveParams.toString()
+          });
+          
+          const approveText = await approveRes.text();
+          let approveData: any = {};
+          try { approveData = JSON.parse(approveText); } 
+          catch { approveData = Object.fromEntries(new URLSearchParams(approveText).entries()); }
+          
+          if (approveData.res_cd === "0000" || approveData.Code === "0000") {
+            kcpTno = approveData.tno;
+          }
+        } catch (e) {
+          console.error("KCP Approval Error:", e);
+        }
+      }
+    }
 
     if (kcpResCd === "0000") {
       // 결제 성공 — 주문 상태 업데이트
