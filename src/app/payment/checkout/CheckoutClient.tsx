@@ -210,60 +210,34 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
         }
 
-        if (isMobile) {
-          if (data.approval_key) {
-            (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
-            (document.getElementById("PayUrl") as HTMLInputElement).value = data.PayUrl;
-            
-            // Dynamic encodingFilter.jsp action resolution from previous working code
-            const payUrl = data.PayUrl;
-            kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
-            kcpForm.submit();
+        if (data.approval_key) {
+          (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
+          (document.getElementById("PayUrl") as HTMLInputElement).value = data.PayUrl;
+          
+          // KCP 결제창 액션 URL 설정
+          const payUrl = data.PayUrl;
+          kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
+          
+          if (!isMobile) {
+            // PC는 팝업창으로 결제 진행
+            const popup = window.open("", "kcp_popup", "width=820,height=600,resizable=yes,scrollbars=yes");
+            if (popup) {
+              kcpForm.target = "kcp_popup";
+            } else {
+              // 팝업 차단 시 현재 창에서 진행
+              kcpForm.target = "_self";
+            }
           } else {
-            alert("모바일 결제 등록에 실패했습니다. (approval_key 누락)");
-            setIsProcessing(false);
+            // 모바일은 현재 창에서 진행
+            kcpForm.target = "_self";
           }
+          
+          // 진행 중 상태 유지 (팝업 또는 창 이동 대기)
+          setTimeout(() => setIsProcessing(false), 3000); 
+          kcpForm.submit();
         } else {
-          // PC: Use KCP JS SDK popup
-          (window as any).m_Completepayment = async function (form: HTMLFormElement, closeEvent: any) {
-            const formData = new FormData(form);
-            const res_cd = formData.get("res_cd");
-            const res_msg = formData.get("res_msg");
-            
-            if (res_cd !== "0000") {
-              if (typeof closeEvent === "function") closeEvent();
-              alert("결제가 취소되었거나 실패했습니다: " + res_msg);
-              setIsProcessing(false);
-              try {
-                await fetch("/api/payment/split-callback", { method: "POST", body: formData });
-              } catch (e) {}
-              return;
-            }
-
-            // Success
-            try {
-              if (typeof closeEvent === "function") closeEvent();
-              setIsVerifying(true);
-              const res = await fetch("/api/payment/split-callback", { method: "POST", body: formData });
-              if (res.ok) {
-                await fetchUpdatedOrder();
-              } else {
-                alert("결제 검증에 실패했습니다.");
-              }
-            } catch (e) {
-              alert("결제 처리 중 오류가 발생했습니다.");
-            } finally {
-              setIsProcessing(false);
-              setIsVerifying(false);
-            }
-          };
-
-          try {
-            (window as any).KCP_Pay_Execute_Web(kcpForm);
-          } catch (kcpError) {
-            console.log("KCP popup error:", kcpError);
-            setIsProcessing(false);
-          }
+          alert("결제 등록에 실패했습니다. (approval_key 누락)");
+          setIsProcessing(false);
         }
       }
     } catch (e) {
