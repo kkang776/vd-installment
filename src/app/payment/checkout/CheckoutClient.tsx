@@ -26,6 +26,8 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const [isSuccess, setIsSuccess] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isVerifying, setIsVerifying] = useState(false);
+  const [extendCount, setExtendCount] = useState(0);
+  const MAX_EXTENSIONS = 3;
 
   // ── Derived values ──
   const totalAmount = order.totalAmount;
@@ -110,7 +112,12 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   }, [paidAmount, totalAmount]);
 
   const handleExtendTimer = () => {
+    if (extendCount >= MAX_EXTENSIONS) {
+      alert("시간 연장은 최대 3회까지 가능합니다.");
+      return;
+    }
     setTimeLeft((prev) => prev + 10 * 60);
+    setExtendCount((prev) => prev + 1);
   };
 
   // ── Row handlers ──
@@ -314,9 +321,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
             <Clock className="w-5 h-5 animate-pulse" />
             <span className="font-medium">⚠️ 남은 금액을 {Math.floor(timeLeft / 60)}분 {timeLeft % 60}초 내에 결제하지 않으시면 이전 결제 내역이 자동 취소됩니다.</span>
           </div>
-          {timeLeft <= 600 && (
+          {timeLeft <= 600 && extendCount < MAX_EXTENSIONS && (
             <button onClick={handleExtendTimer} className="px-4 py-2 bg-orange-100 hover:bg-orange-200 text-orange-700 text-sm font-bold rounded-lg transition-colors">
-              10분 연장하기
+              10분 연장하기 ({MAX_EXTENSIONS - extendCount}회 남음)
             </button>
           )}
         </div>
@@ -486,7 +493,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         name="order_info"
         id="order_info"
         method="post"
-        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp") : "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp"}
+        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "") : (process.env.NEXT_PUBLIC_KCP_PC_URL || "")}
         className="hidden"
       >
         <input type="hidden" name="pay_method" id="pay_method" value="" />
@@ -496,14 +503,14 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="customer@vdrobotics.co.kr" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
-        <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000"} />
+        <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || ""} />
         <input type="hidden" name="req_tx" value="pay" />
         <input type="hidden" name="currency" value="410" />
         <input type="hidden" name="shop_name" value="브이디로보틱스" />
         <input type="hidden" name="approval_key" id="approval_key" value="" />
         <input type="hidden" name="PayUrl" id="PayUrl" value="" />
         <input type="hidden" name="good_cd" value="00" />
-        <input type="hidden" name="Ret_URL" value={`${origin}/api/payment/split-callback`} />
+        <input type="hidden" name="Ret_URL" value={`${process.env.NEXT_PUBLIC_BASE_URL || origin}/api/payment/split-callback`} />
 
         {/* Card restrictions & installment */}
         <input type="hidden" name="quotaopt" id="quotaopt" value="36" />

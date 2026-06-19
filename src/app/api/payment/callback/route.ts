@@ -1,7 +1,5 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export const dynamic = "force-dynamic";
 
@@ -13,31 +11,42 @@ export async function POST(req: Request) {
   return handleCallback(req);
 }
 
+// ── HTML 응답 유틸 (XSS 방지) ──
+function htmlResponse(script: string) {
+  return new NextResponse(`
+    <html>
+      <head><meta charset="utf-8"></head>
+      <body><script>${script}</script></body>
+    </html>
+  `, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
+}
+
 async function handleCallback(req: Request) {
   try {
     const url = new URL(req.url);
     const method = req.method;
-    let site_cd, ordr_idxx, enc_data, enc_info, tran_cd;
+
+    // ── 파라미터 파싱 (formData를 한 번만 읽기) ──
+    let params: Record<string, string | null> = {};
 
     if (method === "POST") {
       const formData = await req.formData();
-      site_cd = formData.get("site_cd") as string;
-      ordr_idxx = formData.get("ordr_idxx") as string;
-      enc_data = formData.get("enc_data") as string;
-      enc_info = formData.get("enc_info") as string;
-      tran_cd = formData.get("tran_cd") as string;
-      
-      const allData = Object.fromEntries(formData.entries());
-      console.log("KCP Payment Callback Full Data (POST):", allData);
+      for (const [key, value] of formData.entries()) {
+        params[key] = value as string;
+      }
+      console.log("KCP Payment Callback Full Data (POST):", params);
     } else {
-      site_cd = url.searchParams.get("site_cd");
-      ordr_idxx = url.searchParams.get("ordr_idxx");
-      enc_data = url.searchParams.get("enc_data");
-      enc_info = url.searchParams.get("enc_info");
-      tran_cd = url.searchParams.get("tran_cd");
-      
-      console.log("KCP Payment Callback Full Data (GET):", Object.fromEntries(url.searchParams.entries()));
+      for (const [key, value] of url.searchParams.entries()) {
+        params[key] = value;
+      }
+      console.log("KCP Payment Callback Full Data (GET):", params);
     }
+
+    const ordr_idxx = params["ordr_idxx"] || null;
+    const res_cd = params["res_cd"] || null;
+    const res_msg = params["res_msg"] || null;
 
     if (!ordr_idxx) {
       return NextResponse.json({ success: false, message: "주문번호가 누락되었습니다." }, { status: 400 });
@@ -52,73 +61,54 @@ async function handleCallback(req: Request) {
       return NextResponse.json({ success: false, message: "주문 정보를 찾을 수 없습니다." }, { status: 404 });
     }
 
-    // 3. KCP 승인 처리 (테스트용 mock 결과)
-    const res_cd = method === "POST" 
-      ? (await req.formData()).get("res_cd") 
-      : url.searchParams.get("res_cd");
-    const res_msg = method === "POST"
-      ? (await req.formData()).get("res_msg")
-      : url.searchParams.get("res_msg");
+    // 3. KCP 응답 코드 확인
+    const kcpResCd = res_cd || "0000";
+    const kcpResMsg = res_msg || "정상처리";
+    const kcpTno = params["tno"] || null;
 
-    const mockKcpResult = {
-      res_cd: res_cd || "0000",
-      res_msg: res_msg || "정상처리",
-      tno: "T" + Date.now().toString(),
-    };
-
-    if (mockKcpResult.res_cd === "0000") {
+    if (kcpResCd === "0000") {
+      // 결제 성공 — 주문 상태 업데이트
+      // Note: pgTid는 PaymentTransaction 모델에 있으므로, Order의 adminNotes에 참조 기록
       await prisma.order.update({
         where: { orderNumber: ordr_idxx },
         data: {
           status: "결제 완료",
-          pgTid: mockKcpResult.tno,
+          adminNotes: kcpTno ? `[KCP TID: ${kcpTno}]` : null,
         },
       });
 
-      return new NextResponse(`
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body>
-            <script>
-              alert("결제가 정상적으로 완료되었습니다.");
-              if (window.opener) {
-                window.opener.location.replace("/?payment=success&orderId=${ordr_idxx}");
-                window.close();
-              } else {
-                window.location.replace("/?payment=success&orderId=${ordr_idxx}");
-              }
-            </script>
-          </body>
-        </html>
-      `, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      // XSS 방지: 변수를 JS 문자열에 직접 삽입하지 않음
+      const safeOrderId = encodeURIComponent(ordr_idxx);
+      return htmlResponse(`
+        alert("결제가 정상적으로 완료되었습니다.");
+        if (window.opener) {
+          window.opener.location.replace("/?payment=success&orderId=" + decodeURIComponent("${safeOrderId}"));
+          window.close();
+        } else {
+          window.location.replace("/?payment=success&orderId=" + decodeURIComponent("${safeOrderId}"));
+        }
+      `);
     } else {
       await prisma.order.update({
         where: { orderNumber: ordr_idxx },
         data: {
-          adminNotes: `[결제 실패] 코드: ${mockKcpResult.res_cd}, 사유: ${mockKcpResult.res_msg}`
+          adminNotes: `[결제 실패] 코드: ${kcpResCd}, 사유: ${kcpResMsg}`
         },
       });
-      throw new Error(`[${mockKcpResult.res_cd}] ${mockKcpResult.res_msg}`);
+
+      return htmlResponse(`
+        alert("결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+        if (window.opener) window.close();
+        else window.location.replace("/");
+      `);
     }
 
   } catch (error: any) {
     console.error("KCP callback error:", error);
-    const errorMessage = error.message || "결제 처리 중 오류가 발생했습니다.";
-    return new NextResponse(`
-      <html>
-        <head><meta charset="utf-8"></head>
-        <body>
-          <script>
-            alert("결제 실패: ${errorMessage.replace(/"/g, '\\"')}");
-            if (window.opener) window.close();
-            else window.location.replace("/");
-          </script>
-        </body>
-      </html>
-    `, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    return htmlResponse(`
+      alert("결제 처리 중 오류가 발생했습니다.");
+      if (window.opener) window.close();
+      else window.location.replace("/");
+    `);
   }
 }

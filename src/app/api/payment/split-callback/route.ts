@@ -1,8 +1,6 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import { sendAlimtalk } from "@/lib/surem";
-
-const prisma = new PrismaClient();
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +10,18 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   return handleCallback(req);
+}
+
+// ── HTML 응답 유틸 (XSS 방지) ──
+function htmlResponse(script: string) {
+  return new NextResponse(`
+    <html>
+      <head><meta charset="utf-8"></head>
+      <body><script>${script}</script></body>
+    </html>
+  `, {
+    headers: { "Content-Type": "text/html; charset=utf-8" },
+  });
 }
 
 async function handleCallback(req: Request) {
@@ -43,116 +53,141 @@ async function handleCallback(req: Request) {
     const app_no = params["app_no"] || null;
     const card_name = params["card_name"] || null;
     const quotaParam = params["quota"] || null;
+    const good_mny = params["good_mny"] || null;
 
-    // If no transaction ID, redirect back to home gracefully
+    // If no order ID, redirect back to home gracefully
     if (!ordr_idxx) {
-      return new NextResponse(`
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.location.reload();
-                window.close();
-              } else {
-                window.location.replace("/");
-              }
-            </script>
-          </body>
-        </html>
-      `, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return htmlResponse(`
+        if (window.opener) { window.opener.location.reload(); window.close(); }
+        else { window.location.replace("/"); }
+      `);
     }
 
-    // Find transaction by KCP order number (stored in pgAppNo) or by ID (fallback)
+    // Find transaction by KCP order number
     let transaction = await prisma.paymentTransaction.findFirst({
       where: { pgAppNo: ordr_idxx },
     });
     if (!transaction) {
-      // Fallback: try finding by ID (for backward compatibility)
       transaction = await prisma.paymentTransaction.findUnique({
         where: { id: ordr_idxx },
       });
     }
 
     if (!transaction) {
-      return new NextResponse(`
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body>
-            <script>
-              alert("결제 정보를 찾을 수 없습니다.");
-              if (window.opener) { window.opener.location.reload(); window.close(); }
-              else { window.location.replace("/"); }
-            </script>
-          </body>
-        </html>
-      `, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return htmlResponse(`
+        alert("결제 정보를 찾을 수 없습니다.");
+        if (window.opener) { window.opener.location.reload(); window.close(); }
+        else { window.location.replace("/"); }
+      `);
     }
 
-    // Check if KCP returned an error (user cancelled or payment failed)
+    // ── 이미 처리된 트랜잭션 중복 콜백 방어 ──
+    if (transaction.status === "SUCCESS") {
+      return htmlResponse(`
+        if (window.opener) { window.opener.location.reload(); window.close(); }
+        else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+      `);
+    }
+
+    // ── KCP 에러 응답 처리 (사용자 취소 또는 결제 실패) ──
     if (res_cd && res_cd !== "0000") {
       await prisma.paymentTransaction.update({
         where: { id: transaction.id },
         data: { status: "FAILED" },
       });
 
-      return new NextResponse(`
-        <html>
-          <head><meta charset="utf-8"></head>
-          <body>
-            <script>
-              if (window.opener) {
-                window.opener.location.reload();
-                window.close();
-              } else {
-                window.location.replace("/payment/checkout?orderId=${transaction.orderId}");
-              }
-            </script>
-          </body>
-        </html>
-      `, {
-        headers: { "Content-Type": "text/html; charset=utf-8" },
-      });
+      return htmlResponse(`
+        if (window.opener) { window.opener.location.reload(); window.close(); }
+        else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+      `);
     }
 
-    // Use KCP-returned card name, or fallback
-    const resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
-    const resolvedTno = tno || ("T" + Date.now().toString());
-    const resolvedAppNo = app_no || Math.floor(10000000 + Math.random() * 90000000).toString();
+    // ── KCP 승인금액 검증 (위변조 방지) ──
+    if (good_mny) {
+      const kcpApprovedAmount = parseInt(good_mny, 10);
+      if (kcpApprovedAmount !== transaction.amount) {
+        console.error("금액 불일치 감지!", {
+          kcpApprovedAmount,
+          dbRequestedAmount: transaction.amount,
+          transactionId: transaction.id,
+          orderId: transaction.orderId,
+        });
+        await prisma.paymentTransaction.update({
+          where: { id: transaction.id },
+          data: { status: "FAILED" },
+        });
+        return htmlResponse(`
+          alert("결제 금액 검증에 실패했습니다. 자동으로 취소 처리됩니다.");
+          if (window.opener) { window.opener.location.reload(); window.close(); }
+          else { window.location.replace("/"); }
+        `);
+      }
+    }
 
+    // ── KCP 거래번호 필수 확인 ──
+    if (!tno) {
+      console.error("KCP tno(거래번호) 누락 — ordr_idxx:", ordr_idxx);
+      // 테스트 환경에서는 허용, 운영에서는 차단
+      if (process.env.NODE_ENV === "production") {
+        await prisma.paymentTransaction.update({
+          where: { id: transaction.id },
+          data: { status: "FAILED" },
+        });
+        return htmlResponse(`
+          alert("결제 처리 중 오류가 발생했습니다. (거래번호 누락)");
+          if (window.opener) { window.opener.location.reload(); window.close(); }
+          else { window.location.replace("/"); }
+        `);
+      }
+    }
+
+    const resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
+    const resolvedTno = tno || ("DEV_" + Date.now().toString());
+    const resolvedAppNo = app_no || ("DEV_" + Math.floor(10000000 + Math.random() * 90000000).toString());
     const resolvedQuota = quotaParam ? parseInt(quotaParam, 10) : null;
 
-    await prisma.paymentTransaction.update({
-      where: { id: transaction.id },
-      data: {
-        status: "SUCCESS",
-        pgTid: resolvedTno,
-        pgAppNo: resolvedAppNo,
-        cardCompanyName: resolvedCardName,
-        quota: resolvedQuota,
-        pgAppDate: new Date().toISOString(),
-      },
-    });
-
-    // Check if entire order is fully paid
-    const allTransactions = await prisma.paymentTransaction.findMany({
-      where: { orderId: transaction.orderId, status: "SUCCESS" }
-    });
-
-    const paidAmount = allTransactions.reduce((acc, t) => acc + (t.amount - t.cancelAmount), 0);
-    const order = await prisma.order.findUnique({ where: { id: transaction.orderId } });
-
-    if (order && paidAmount >= order.totalAmount) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: "PAID" },
+    // ── Prisma 트랜잭션으로 원자적 업데이트 ──
+    const { orderStatus, order } = await prisma.$transaction(async (tx) => {
+      await tx.paymentTransaction.update({
+        where: { id: transaction!.id },
+        data: {
+          status: "SUCCESS",
+          pgTid: resolvedTno,
+          pgAppNo: resolvedAppNo,
+          cardCompanyName: resolvedCardName,
+          quota: resolvedQuota,
+          pgAppDate: new Date().toISOString(),
+        },
       });
-      
-      // Send Alimtalk notification (awaited with error logging)
+
+      // 전체 주문 결제 현황 확인
+      const allTransactions = await tx.paymentTransaction.findMany({
+        where: { orderId: transaction!.orderId, status: "SUCCESS" }
+      });
+
+      const paidAmount = allTransactions.reduce((acc, t) => acc + (t.amount - t.cancelAmount), 0);
+      const currentOrder = await tx.order.findUnique({ where: { id: transaction!.orderId } });
+
+      let newStatus = currentOrder?.status || "PENDING";
+      if (currentOrder && paidAmount >= currentOrder.totalAmount) {
+        newStatus = "PAID";
+        await tx.order.update({
+          where: { id: currentOrder.id },
+          data: { status: "PAID" },
+        });
+      } else if (currentOrder && paidAmount > 0) {
+        newStatus = "PARTIALLY_PAID";
+        await tx.order.update({
+          where: { id: currentOrder.id },
+          data: { status: "PARTIALLY_PAID" },
+        });
+      }
+
+      return { orderStatus: newStatus, order: currentOrder };
+    });
+
+    // ── 전액 결제 완료 시 알림톡 발송 ──
+    if (orderStatus === "PAID" && order) {
       try {
         console.log("Triggering Alimtalk for order:", order.id, order.ordererPhone);
         const alimtalkResult = await sendAlimtalk({
@@ -167,45 +202,17 @@ async function handleCallback(req: Request) {
       } catch (err) {
         console.error("Alimtalk send error:", err);
       }
-
-    } else if (order && paidAmount > 0) {
-      await prisma.order.update({
-        where: { id: order.id },
-        data: { status: "PARTIALLY_PAID" },
-      });
     }
 
-    return new NextResponse(`
-      <html>
-        <head><meta charset="utf-8"></head>
-        <body>
-          <script>
-            if (window.opener) {
-              window.opener.location.reload();
-              window.close();
-            } else {
-              window.location.replace("/payment/checkout?orderId=${transaction.orderId}");
-            }
-          </script>
-        </body>
-      </html>
-    `, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    return htmlResponse(`
+      if (window.opener) { window.opener.location.reload(); window.close(); }
+      else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+    `);
   } catch (error: any) {
     console.error("Split KCP callback error:", error);
-    return new NextResponse(`
-      <html>
-        <head><meta charset="utf-8"></head>
-        <body>
-          <script>
-            if (window.opener) { window.opener.location.reload(); window.close(); }
-            else { window.history.back(); }
-          </script>
-        </body>
-      </html>
-    `, {
-      headers: { "Content-Type": "text/html; charset=utf-8" },
-    });
+    return htmlResponse(`
+      if (window.opener) { window.opener.location.reload(); window.close(); }
+      else { window.history.back(); }
+    `);
   }
 }

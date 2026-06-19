@@ -1,21 +1,56 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
 
 export async function POST(request: Request) {
   try {
     const { orderId, amount, method, cardCompanyName } = await request.json();
 
+    // ── 주문 조회 ──
     const order = await prisma.order.findUnique({ where: { id: orderId } });
     if (!order) {
       return NextResponse.json({ success: false, error: "Order not found" });
     }
 
-    // Generate KCP-friendly order number (alphanumeric, short, unique)
+    // ── KCP 상점코드 필수 확인 ──
+    const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
+    if (!site_cd) {
+      console.error("NEXT_PUBLIC_KCP_SITE_CODE 환경변수 미설정");
+      return NextResponse.json({ success: false, error: "결제 시스템 설정 오류" }, { status: 500 });
+    }
+
+    // ── 금액 검증 ──
+    if (!amount || amount <= 0) {
+      return NextResponse.json({ success: false, error: "유효하지 않은 결제 금액입니다." }, { status: 400 });
+    }
+
+    // ── 이미 결제된/진행 중인 금액 계산 ──
+    const existingTransactions = await prisma.paymentTransaction.findMany({
+      where: { orderId, status: { in: ["PENDING", "SUCCESS"] } }
+    });
+    const alreadyPaidOrPending = existingTransactions.reduce((acc, t) => acc + t.amount, 0);
+
+    if (alreadyPaidOrPending + amount > order.totalAmount) {
+      return NextResponse.json({
+        success: false,
+        error: `결제 금액 초과: 남은 금액 ${order.totalAmount - alreadyPaidOrPending}원`
+      }, { status: 400 });
+    }
+
+    // ── 동일 주문에 대해 PENDING 트랜잭션이 이미 있으면 차단 (중복 방지) ──
+    const existingPending = await prisma.paymentTransaction.findFirst({
+      where: { orderId, status: "PENDING" },
+    });
+    if (existingPending) {
+      return NextResponse.json({
+        success: false,
+        error: "이미 진행 중인 결제가 있습니다. 완료 후 다시 시도해주세요."
+      }, { status: 409 });
+    }
+
+    // ── KCP 주문번호 생성 ──
     const kcpOrderNo = `${order.orderNumber.replace(/[^A-Z0-9]/gi, "")}_${Date.now().toString(36).toUpperCase()}`;
 
-    // Create a pending transaction
+    // ── PENDING 트랜잭션 생성 ──
     const transaction = await prisma.paymentTransaction.create({
       data: {
         orderId,
@@ -30,17 +65,18 @@ export async function POST(request: Request) {
     let approval_key = "";
     let PayUrl = "";
 
-    // Call KCP Trade Registration using exact JSON format that previously worked
+    // ── KCP 거래 등록 ──
     try {
-      const protocol = request.headers.get("x-forwarded-proto") || "https";
-      const host = request.headers.get("host");
-      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || `${protocol}://${host}`;
+      const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+      if (!baseUrl) {
+        const protocol = request.headers.get("x-forwarded-proto") || "https";
+        const host = request.headers.get("host");
+        console.warn("NEXT_PUBLIC_BASE_URL 미설정, 헤더 기반 추론:", `${protocol}://${host}`);
+      }
+      const resolvedBaseUrl = baseUrl || `${request.headers.get("x-forwarded-proto") || "https"}://${request.headers.get("host")}`;
 
-      const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000";
-      const isTest = site_cd === "T0000" || site_cd.startsWith("T");
-      const defaultTradeRegUrl = isTest 
-        ? "https://testsmpay.kcp.co.kr/trade/register.do" 
-        : "https://smpay.kcp.co.kr/trade/register.do";
+      // 환경변수에서 거래등록 URL 가져오기 (테스트/운영 분기)
+      const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
 
       const tradeRegData = {
         site_cd,
@@ -48,29 +84,33 @@ export async function POST(request: Request) {
         good_mny: amount.toString(),
         good_name: order.productName,
         pay_method: method === "CARD" ? "CARD" : "VCNT",
-        Ret_URL: `${baseUrl}/api/payment/split-callback`,
+        Ret_URL: `${resolvedBaseUrl}/api/payment/split-callback`,
       };
 
-      console.log("KCP Trade Registration Request (JSON):", tradeRegData);
+      console.log("KCP Trade Registration Request:", { url: targetUrl, data: tradeRegData });
 
-      const targetUrl = process.env.KCP_TRADE_REG_URL || defaultTradeRegUrl;
       const tradeRegRes = await fetch(targetUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/json; charset=utf-8" }, // EXACT MATCH to working old code
-        body: JSON.stringify(tradeRegData), // EXACT MATCH to working old code
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(tradeRegData),
       });
 
       const rawResText = await tradeRegRes.text();
-      console.log("KCP Trade Registration Raw Response:", rawResText);
+      console.log("KCP Trade Registration Response:", rawResText);
 
       let tradeRegResult: any = {};
       try {
         tradeRegResult = JSON.parse(rawResText);
       } catch (e) {
         console.error("KCP Response is not JSON:", rawResText);
+        // 실패 시 PENDING 트랜잭션 정리
+        await prisma.paymentTransaction.update({
+          where: { id: transaction.id },
+          data: { status: "FAILED" },
+        });
         return NextResponse.json({
           success: false,
-          error: `KCP 서버 응답 형식이 올바르지 않습니다: ${rawResText.substring(0, 200)}`,
+          error: `KCP 서버 응답 형식이 올바르지 않습니다.`,
         });
       }
 
@@ -78,18 +118,23 @@ export async function POST(request: Request) {
         approval_key = tradeRegResult.approvalKey;
         PayUrl = tradeRegResult.PayUrl;
       } else {
+        // 실패 시 PENDING 트랜잭션 정리
+        await prisma.paymentTransaction.update({
+          where: { id: transaction.id },
+          data: { status: "FAILED" },
+        });
         return NextResponse.json({
           success: false,
           error: `KCP 거래 등록 실패: [${tradeRegResult.Code}] ${tradeRegResult.Message || "상세 사유 없음"}`,
-          debug: {
-            url: targetUrl,
-            request: tradeRegData,
-            response: tradeRegResult
-          }
         });
       }
     } catch (e: any) {
       console.error("KCP connection exception:", e);
+      // 실패 시 PENDING 트랜잭션 정리
+      await prisma.paymentTransaction.update({
+        where: { id: transaction.id },
+        data: { status: "FAILED" },
+      });
       return NextResponse.json({ success: false, error: `KCP 서버 연결 실패: ${e.message}` });
     }
 
@@ -102,6 +147,6 @@ export async function POST(request: Request) {
     });
   } catch (error: any) {
     console.error("Split request error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "결제 요청 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

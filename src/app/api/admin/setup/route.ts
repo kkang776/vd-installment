@@ -1,10 +1,13 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 
-const prisma = new PrismaClient();
-
+// ⚠️ 초기 관리자 계정 생성 전용. 운영 환경에서는 접근 차단.
 export async function GET() {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "This endpoint is disabled in production" }, { status: 403 });
+  }
+
   try {
     const adminExists = await prisma.admin.findUnique({
       where: { username: "admin" }
@@ -18,7 +21,7 @@ export async function GET() {
           password: hashedPassword,
         }
       });
-      return NextResponse.json({ success: true, message: "Admin account created: admin / admin123" });
+      return NextResponse.json({ success: true, message: "Admin account created." });
     } else {
       return NextResponse.json({ success: true, message: "Admin account already exists." });
     }

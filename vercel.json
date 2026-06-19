@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/payment-timeout",
+      "schedule": "*/5 * * * *"
+    }
+  ]
+}

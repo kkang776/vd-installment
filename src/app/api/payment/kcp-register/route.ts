@@ -6,19 +6,22 @@ export async function POST(request: Request) {
     const body = await request.json();
     const { site_cd, ordr_idxx, good_mny, good_name, pay_method, Ret_URL } = body;
 
+    if (!site_cd) {
+      return Response.json({ success: false, error: "KCP 상점코드(site_cd) 누락" }, { status: 400 });
+    }
+
     const tradeRegParams = new URLSearchParams();
-    tradeRegParams.append("site_cd", site_cd || "T0000");
+    tradeRegParams.append("site_cd", site_cd);
     tradeRegParams.append("ordr_idxx", ordr_idxx);
     tradeRegParams.append("good_mny", good_mny);
     tradeRegParams.append("good_name", good_name);
     tradeRegParams.append("pay_method", pay_method);
     tradeRegParams.append("Ret_URL", Ret_URL);
 
-    const targetUrl = (site_cd === "T0000" || site_cd?.startsWith("T"))
-      ? "https://testsmpay.kcp.co.kr/trade/register.do"
-      : "https://smpay.kcp.co.kr/trade/register.do";
+    // 환경변수에서 거래등록 URL 가져오기 (테스트/운영 자동 분기)
+    const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
 
-    console.log("Edge KCP register.do request:", Object.fromEntries(tradeRegParams.entries()));
+    console.log("Edge KCP register.do request:", { url: targetUrl, params: Object.fromEntries(tradeRegParams.entries()) });
 
     const res = await fetch(targetUrl, {
       method: "POST",
@@ -33,7 +36,7 @@ export async function POST(request: Request) {
     try {
       parsed = JSON.parse(text);
     } catch {
-      return Response.json({ success: false, error: "KCP 응답 파싱 실패", raw: text });
+      return Response.json({ success: false, error: "KCP 응답 파싱 실패" });
     }
 
     if (parsed.Code === "0000") {
@@ -47,10 +50,9 @@ export async function POST(request: Request) {
       return Response.json({
         success: false,
         error: `[${parsed.Code}] ${parsed.Message}`,
-        raw: parsed,
       });
     }
   } catch (error: any) {
-    return Response.json({ success: false, error: error.message }, { status: 500 });
+    return Response.json({ success: false, error: "KCP 거래등록 처리 중 오류" }, { status: 500 });
   }
 }

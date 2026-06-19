@@ -36,10 +36,10 @@ export default async function CheckoutPage({ searchParams }: { searchParams: { o
       <div className="min-h-screen bg-gray-50 p-8 flex items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-xl max-w-2xl w-full text-center">
           <h2 className="text-red-600 text-2xl font-bold mb-4">페이지를 불러오는 중 오류가 발생했습니다</h2>
-          <div className="bg-gray-100 p-4 rounded text-left text-sm text-red-800 break-all overflow-auto font-mono">
-            {error?.message || String(error)}
+          <div className="bg-gray-100 p-4 rounded text-left text-sm text-gray-700 break-all overflow-auto">
+            일시적인 서비스 오류가 발생했습니다. 잠시 후 다시 시도해주세요.
           </div>
-          <p className="mt-6 text-gray-500 text-sm">해당 화면을 캡쳐하여 알려주시면 즉시 해결해 드리겠습니다.</p>
+          <p className="mt-6 text-gray-500 text-sm">문제가 지속되면 고객센터(1833-3482)로 연락해주세요.</p>
         </div>
       </div>
     );

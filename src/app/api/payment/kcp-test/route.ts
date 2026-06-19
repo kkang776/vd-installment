@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // Diagnostic endpoint to test KCP trade registration with minimal parameters
+// ⚠️ 운영 환경에서는 접근 차단
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "This endpoint is disabled in production" }, { status: 403 });
+  }
+
   const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000";
   const isTest = site_cd === "T0000" || site_cd.startsWith("T");
   const targetUrl = isTest

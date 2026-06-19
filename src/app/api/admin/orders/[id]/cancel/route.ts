@@ -1,45 +1,64 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-import { cookies } from "next/headers";
-import jwt from "jsonwebtoken";
-
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_development";
+import prisma from "@/lib/prisma";
+import { verifyAdminAuth } from "@/lib/auth";
+import { executeKcpCancel } from "@/lib/kcp";
 
 export async function POST(
   request: Request,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const cookieStore = await cookies();
-    const token = cookieStore.get("admin_token")?.value;
-
-    if (!token) {
+    const admin = await verifyAdminAuth();
+    if (!admin) {
       return NextResponse.json({ success: false, message: "Unauthorized" }, { status: 401 });
     }
 
-    try {
-      jwt.verify(token, JWT_SECRET);
-    } catch (e) {
-      return NextResponse.json({ success: false, message: "Invalid token" }, { status: 401 });
-    }
-
-    const { id } = params;
+    const { id } = await params;
     const { reason } = await request.json();
 
     const order = await prisma.order.findUnique({
       where: { id },
+      include: { transactions: true },
     });
 
     if (!order) {
       return NextResponse.json({ success: false, message: "Order not found" }, { status: 404 });
     }
 
-    // TODO: 실제로 KCP 결제 취소 API를 호출하는 로직이 여기에 들어갑니다.
-    // const kcpCancelResult = await callKcpCancelApi(order.pgTid, reason);
-    // if (!kcpCancelResult.success) {
-    //   throw new Error("PG 취소 실패");
-    // }
+    // 성공한 트랜잭션에 대해 KCP 취소 API 호출
+    const successfulTransactions = order.transactions.filter(
+      (t) => t.status === "SUCCESS" && t.cancelAmount === 0
+    );
+
+    const cancelResults: string[] = [];
+    for (const tx of successfulTransactions) {
+      if (tx.pgTid) {
+        const cancelResult = await executeKcpCancel({
+          pgTid: tx.pgTid,
+          cancelAmount: tx.amount,
+          cancelReason: reason || "관리자 결제 취소",
+        });
+
+        if (!cancelResult.success) {
+          cancelResults.push(`TX ${tx.id}: ${cancelResult.message}`);
+          console.error("KCP 취소 실패:", cancelResult);
+          // 하나라도 실패하면 중단하고 에러 반환
+          return NextResponse.json({
+            success: false,
+            message: `PG 취소 처리 실패: ${cancelResult.message}`,
+          }, { status: 500 });
+        }
+      }
+
+      // KCP 취소 성공 후 DB 업데이트
+      await prisma.paymentTransaction.update({
+        where: { id: tx.id },
+        data: {
+          status: "CANCELLED",
+          cancelAmount: tx.amount,
+        },
+      });
+    }
 
     // DB 상태 업데이트
     await prisma.order.update({

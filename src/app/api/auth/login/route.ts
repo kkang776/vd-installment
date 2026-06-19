@@ -1,27 +1,15 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
+import prisma from "@/lib/prisma";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
-
-const prisma = new PrismaClient();
-const JWT_SECRET = process.env.JWT_SECRET || "fallback_secret_for_development";
+import { getJwtSecret } from "@/lib/auth";
 
 export async function POST(request: Request) {
   try {
     const { username, password } = await request.json();
 
-    // Emergency Fallback Login (admin / admin1234)
-    if (username === "admin" && password === "admin1234") {
-      const token = jwt.sign({ adminId: "emergency-id", username: "admin" }, JWT_SECRET, { expiresIn: "1d" });
-      const response = NextResponse.json({ success: true });
-      response.cookies.set("admin_token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        sameSite: "lax",
-        maxAge: 60 * 60 * 24,
-        path: "/",
-      });
-      return response;
+    if (!username || !password) {
+      return NextResponse.json({ success: false, message: "아이디와 비밀번호를 입력해주세요." }, { status: 400 });
     }
 
     const admin = await prisma.admin.findUnique({
@@ -29,14 +17,15 @@ export async function POST(request: Request) {
     });
 
     if (!admin) {
-      return NextResponse.json({ success: false, message: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ success: false, message: "아이디 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
     }
 
     const isValid = await bcrypt.compare(password, admin.password);
     if (!isValid) {
-      return NextResponse.json({ success: false, message: "Invalid credentials" }, { status: 401 });
+      return NextResponse.json({ success: false, message: "아이디 또는 비밀번호가 올바르지 않습니다." }, { status: 401 });
     }
 
+    const JWT_SECRET = getJwtSecret();
     const token = jwt.sign({ adminId: admin.id, username: admin.username }, JWT_SECRET, { expiresIn: "1d" });
 
     const response = NextResponse.json({ success: true });
@@ -51,6 +40,6 @@ export async function POST(request: Request) {
     return response;
   } catch (error) {
     console.error("Login error:", error);
-    return NextResponse.json({ success: false, message: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ success: false, message: "로그인 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

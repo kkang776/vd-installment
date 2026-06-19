@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+import { executeKcpCancel } from "@/lib/kcp";
 
 export async function POST(request: Request) {
   try {
@@ -16,13 +15,27 @@ export async function POST(request: Request) {
     }
 
     if (transaction.status !== "SUCCESS") {
-      return NextResponse.json({ success: false, error: "Can only cancel successful transactions" });
+      return NextResponse.json({ success: false, error: "성공한 결제만 취소할 수 있습니다." });
     }
 
-    // Call KCP Cancel API (Mocked here)
-    // let kcpCancelSuccess = await executeKCPCancel(transaction.pgTid);
+    // ── KCP 결제 취소 API 호출 ──
+    if (transaction.pgTid) {
+      const cancelResult = await executeKcpCancel({
+        pgTid: transaction.pgTid,
+        cancelAmount: transaction.amount,
+        cancelReason: "사용자 결제 취소",
+      });
 
-    // Update database
+      if (!cancelResult.success) {
+        console.error("KCP 취소 실패:", cancelResult);
+        return NextResponse.json({
+          success: false,
+          error: `PG 취소 처리 실패: ${cancelResult.message}`
+        }, { status: 500 });
+      }
+    }
+
+    // ── DB 업데이트 ──
     await prisma.paymentTransaction.update({
       where: { id: transactionId },
       data: {
@@ -31,7 +44,7 @@ export async function POST(request: Request) {
       }
     });
 
-    // Update order status if needed
+    // 주문 상태 재계산
     const allTransactions = await prisma.paymentTransaction.findMany({
       where: { orderId: transaction.orderId, status: "SUCCESS" }
     });
@@ -40,7 +53,7 @@ export async function POST(request: Request) {
     if (paidAmount === 0) {
       await prisma.order.update({
         where: { id: transaction.orderId },
-        data: { status: "PENDING" }, // Back to pending if all cancelled
+        data: { status: "PENDING" },
       });
     } else {
       await prisma.order.update({
@@ -52,6 +65,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Cancel error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "취소 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }

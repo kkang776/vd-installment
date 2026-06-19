@@ -3,7 +3,12 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 // Test endpoint to verify SureM Alimtalk API connectivity
+// ⚠️ 운영 환경에서는 접근 차단
 export async function GET(request: Request) {
+  if (process.env.NODE_ENV === "production") {
+    return NextResponse.json({ error: "This endpoint is disabled in production" }, { status: 403 });
+  }
+
   const accessToken = process.env.SUREM_ACCESS_TOKEN || process.env.SUREM_USER_CODE;
   const senderKey = process.env.SUREM_PROFILE_KEY;
   const templateCode = process.env.SUREM_TEMPLATE_CODE;

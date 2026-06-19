@@ -1,7 +1,6 @@
 import { NextResponse } from "next/server";
-import { PrismaClient } from "@prisma/client";
-
-const prisma = new PrismaClient();
+import prisma from "@/lib/prisma";
+import { executeKcpCancel } from "@/lib/kcp";
 
 export async function POST(request: Request) {
   try {
@@ -31,9 +30,20 @@ export async function POST(request: Request) {
       (t) => t.status === "SUCCESS" && t.cancelAmount === 0
     );
 
-    // Call KCP Cancel API for each successful transaction (Mocked here)
+    // ── KCP 취소 API 호출 + DB 업데이트 ──
     for (const tx of successfulTransactions) {
-      // let kcpCancelSuccess = await executeKCPCancel(tx.pgTid);
+      if (tx.pgTid) {
+        const cancelResult = await executeKcpCancel({
+          pgTid: tx.pgTid,
+          cancelAmount: tx.amount,
+          cancelReason: reason || "TIMEOUT_ROLLBACK",
+        });
+
+        if (!cancelResult.success) {
+          console.error("KCP 롤백 취소 실패:", { txId: tx.id, result: cancelResult });
+          // 롤백은 최선을 다하되 계속 진행
+        }
+      }
       
       await prisma.paymentTransaction.update({
         where: { id: tx.id },
@@ -57,6 +67,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error: any) {
     console.error("Rollback error:", error);
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: false, error: "롤백 처리 중 오류가 발생했습니다." }, { status: 500 });
   }
 }
