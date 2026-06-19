@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang="ko" className={`${notoSansKr.variable} font-sans`}>
       <body className="min-h-screen bg-gray-50 text-gray-900 flex flex-col antialiased">
         {children}
-        <Script src="https://testspay.kcp.co.kr/plugin/kcp_spay_hub.js" strategy="lazyOnload" />
+        <Script src={process.env.NEXT_PUBLIC_KCP_JS_URL || "https://spay.kcp.co.kr/plugin/kcp_spay_hub.js"} strategy="lazyOnload" />
       </body>
     </html>
   );
