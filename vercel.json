@@ -2,7 +2,7 @@
   "crons": [
     {
       "path": "/api/cron/payment-timeout",
-      "schedule": "*/5 * * * *"
+      "schedule": "0 0 * * *"
     }
   ]
 }
