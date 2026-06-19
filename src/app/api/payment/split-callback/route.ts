@@ -47,6 +47,8 @@ async function handleCallback(req: Request) {
       if (!params[key]) params[key] = value;
     }
 
+    console.log("KCP Payment Split Callback Full Data:", params);
+
     const ordr_idxx = params["ordr_idxx"] || null;
     const res_cd = params["res_cd"] || null;
     const tno = params["tno"] || null;
