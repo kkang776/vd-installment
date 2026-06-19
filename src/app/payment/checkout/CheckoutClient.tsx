@@ -351,140 +351,168 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
       {/* 3. Split Payment UI */}
       <section className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 sm:p-8">
-        <h2 className="text-xl font-bold mb-6">결제 수단 및 금액 설정</h2>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Area: 결제 설정 및 버튼 */}
+          <div className="lg:col-span-2 space-y-6">
+            <h2 className="text-xl font-bold">결제 수단 및 금액 설정</h2>
 
-        <div className="space-y-4">
-          {paymentRows.map((row, index) => (
-            <div key={row.id} className={`p-4 sm:p-6 rounded-xl border-2 transition-all ${row.status === 'SUCCESS' ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white'}`}>
-              <div className="flex flex-col gap-4">
+            <div className="space-y-4">
+              {paymentRows.map((row, index) => (
+                <div key={row.id} className={`p-4 sm:p-6 rounded-xl border-2 transition-all ${row.status === 'SUCCESS' ? 'border-green-200 bg-green-50/30' : 'border-gray-200 bg-white'}`}>
+                  <div className="flex flex-col gap-4">
 
-                {row.status === "SUCCESS" ? (
-                  /* ── 결제 완료된 행 ── */
-                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
-                    <div className="flex items-center gap-3 flex-1">
-                      <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
-                        <CheckCircle className="w-6 h-6 text-green-500" />
-                      </div>
-                      <div>
-                        <div className="font-bold text-gray-900">{row.cardCompanyName || row.method}</div>
-                        <div className="text-sm text-gray-500">승인번호: {row.pgAppNo}</div>
-                      </div>
-                    </div>
-                    <div className="text-xl font-black">{row.amount.toLocaleString()}원</div>
-                    <button
-                      onClick={() => handleCancelPayment(row.id)}
-                      className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-medium"
-                    >
-                      결제 취소
-                    </button>
-                  </div>
-                ) : (
-                  /* ── 결제 대기 행 ── */
-                  <div className="flex-1 w-full space-y-4">
-                    {/* Row 1: 결제수단 + 카드사 + 할부기간 */}
-                    <div className="flex flex-wrap gap-3 items-center">
-                      <div>
-                        <label className="block text-xs font-medium text-gray-500 mb-1">결제수단</label>
-                        <select
-                          value={row.method}
-                          onChange={(e) => updateRow(row.id, "method", e.target.value)}
-                          className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
+                    {row.status === "SUCCESS" ? (
+                      /* ── 결제 완료된 행 ── */
+                      <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        <div className="flex items-center gap-3 flex-1">
+                          <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+                            <CheckCircle className="w-6 h-6 text-green-500" />
+                          </div>
+                          <div>
+                            <div className="font-bold text-gray-900">{row.cardCompanyName || row.method}</div>
+                            <div className="text-sm text-gray-500">승인번호: {row.pgAppNo}</div>
+                          </div>
+                        </div>
+                        <div className="text-xl font-black">{row.amount.toLocaleString()}원</div>
+                        <button
+                          onClick={() => handleCancelPayment(row.id)}
+                          className="px-4 py-2 border border-gray-300 text-gray-600 rounded-lg hover:bg-gray-50 text-sm font-medium"
                         >
-                          <option value="CARD">신용카드</option>
-                          <option value="VIRTUAL_ACCOUNT">가상계좌</option>
-                        </select>
-                      </div>
-
-                      {row.method === "CARD" && (
-                        <>
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">카드사 선택</label>
-                            <select
-                              value={row.cardCode || ""}
-                              onChange={(e) => handleCardChange(row.id, e.target.value)}
-                              className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
-                            >
-                              {ALLOWED_CARDS.map(card => (
-                                <option key={card.code} value={card.code}>{card.name}</option>
-                              ))}
-                            </select>
-                          </div>
-
-                          <div>
-                            <label className="block text-xs font-medium text-gray-500 mb-1">할부기간</label>
-                            <select
-                              value={row.quota || 36}
-                              onChange={(e) => updateRow(row.id, "quota", parseInt(e.target.value))}
-                              className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
-                            >
-                              <option value={36}>36개월 (무이자)</option>
-                            </select>
-                          </div>
-                        </>
-                      )}
-
-                      {index > 0 && paymentRows.filter(r => r.status === "PENDING").length > 1 && (
-                        <button onClick={() => removeRow(row.id)} className="p-3 text-gray-400 hover:text-red-500 transition-colors mt-4">
-                          <Trash2 className="w-5 h-5" />
+                          결제 취소
                         </button>
-                      )}
-                    </div>
-
-                    {/* Row 2: 금액 입력 */}
-                    <div>
-                      <label className="block text-xs font-medium text-gray-500 mb-1">결제 금액</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          value={row.amount ? formatNumber(row.amount) : ''}
-                          onChange={(e) => {
-                            const raw = parseFormattedNumber(e.target.value);
-                            updateRow(row.id, "amount", raw);
-                          }}
-                          className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 pr-12 text-right font-bold text-lg"
-                          placeholder="금액 입력"
-                        />
-                        <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">원</span>
                       </div>
-                    </div>
+                    ) : (
+                      /* ── 결제 대기 행 ── */
+                      <div className="flex-1 w-full space-y-4">
+                        {/* Row 1: 결제수단 + 카드사 */}
+                        <div className="flex flex-wrap gap-3 items-center">
+                          <div>
+                            <label className="block text-xs font-medium text-gray-500 mb-1">결제수단</label>
+                            <select
+                              value={row.method}
+                              onChange={(e) => updateRow(row.id, "method", e.target.value)}
+                              className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
+                            >
+                              <option value="CARD">신용카드</option>
+                              <option value="VIRTUAL_ACCOUNT">가상계좌</option>
+                            </select>
+                          </div>
 
-                    {/* Row 3: Quick Buttons */}
-                    <div className="flex flex-wrap gap-2">
-                      <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 1000000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+100만</button>
-                      <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 100000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+10만</button>
-                      <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 1000000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-100만</button>
-                      <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 100000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-10만</button>
-                      <button type="button" onClick={() => updateRow(row.id, "amount", remainingAmount)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg transition-colors">전액</button>
-                      <button type="button" onClick={() => updateRow(row.id, "amount", 0)} className="px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm font-medium rounded-lg transition-colors">초기화</button>
-                    </div>
+                          {row.method === "CARD" && (
+                            <div>
+                              <label className="block text-xs font-medium text-gray-500 mb-1">카드사 선택</label>
+                              <select
+                                value={row.cardCode || ""}
+                                onChange={(e) => handleCardChange(row.id, e.target.value)}
+                                className="px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 bg-white text-sm font-medium"
+                              >
+                                {ALLOWED_CARDS.map(card => (
+                                  <option key={card.code} value={card.code}>{card.name}</option>
+                                ))}
+                              </select>
+                            </div>
+                          )}
+
+                          {index > 0 && paymentRows.filter(r => r.status === "PENDING").length > 1 && (
+                            <button onClick={() => removeRow(row.id)} className="p-3 text-gray-400 hover:text-red-500 transition-colors mt-4">
+                              <Trash2 className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+
+                        {/* Row 2: 금액 입력 */}
+                        <div>
+                          <label className="block text-xs font-medium text-gray-500 mb-1">결제 금액</label>
+                          <div className="relative">
+                            <input
+                              type="text"
+                              value={row.amount ? formatNumber(row.amount) : ''}
+                              onChange={(e) => {
+                                const raw = parseFormattedNumber(e.target.value);
+                                updateRow(row.id, "amount", raw);
+                              }}
+                              className="w-full px-4 py-3 border border-gray-300 rounded-xl outline-none focus:border-red-500 pr-12 text-right font-bold text-lg"
+                              placeholder="금액 입력"
+                            />
+                            <span className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-500 font-medium">원</span>
+                          </div>
+                        </div>
+
+                        {/* Row 3: Quick Buttons */}
+                        <div className="flex flex-wrap gap-2">
+                          <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 1000000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+100만</button>
+                          <button type="button" onClick={() => updateRow(row.id, "amount", (row.amount || 0) + 100000)} className="px-3 py-1.5 bg-blue-50 hover:bg-blue-100 text-blue-700 text-sm font-medium rounded-lg transition-colors">+10만</button>
+                          <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 1000000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-100만</button>
+                          <button type="button" onClick={() => updateRow(row.id, "amount", Math.max(0, (row.amount || 0) - 100000))} className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm font-medium rounded-lg transition-colors">-10만</button>
+                          <button type="button" onClick={() => updateRow(row.id, "amount", remainingAmount)} className="px-3 py-1.5 bg-red-50 hover:bg-red-100 text-red-600 text-sm font-bold rounded-lg transition-colors">전액</button>
+                          <button type="button" onClick={() => updateRow(row.id, "amount", 0)} className="px-3 py-1.5 bg-yellow-50 hover:bg-yellow-100 text-yellow-700 text-sm font-medium rounded-lg transition-colors">초기화</button>
+                        </div>
+                      </div>
+                    )}
+
                   </div>
-                )}
+                </div>
+              ))}
+            </div>
 
+            {paidAmount < totalAmount && (
+              <button
+                onClick={addRow}
+                className="mt-4 w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-xl hover:border-red-500 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <Plus className="w-5 h-5" /> 분할결제 추가하기
+              </button>
+            )}
+
+            <div className="mt-8 pt-8 border-t border-gray-100">
+              <button
+                onClick={handlePayment}
+                disabled={!isTotalMatched || paidAmount === totalAmount || isProcessing}
+                className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-black text-lg py-5 rounded-xl shadow-lg transition-all"
+              >
+                {paidAmount === totalAmount ? "결제가 완료되었습니다" : isProcessing ? "처리 중..." : "결제 진행"}
+              </button>
+              {!isTotalMatched && paidAmount < totalAmount && (
+                <p className="text-red-500 text-sm text-center mt-3 font-medium">모든 결제 금액의 합계가 총 결제 금액과 일치해야 합니다.</p>
+              )}
+            </div>
+          </div>
+
+          {/* Right Area: 결제전 확인 사항 */}
+          <div>
+            <div className="bg-gray-50 border border-gray-200/60 rounded-2xl p-5 sm:p-6 lg:sticky lg:top-4">
+              <h3 className="font-bold text-gray-950 text-base mb-4 flex items-center gap-2">
+                <span className="w-1.5 h-4 bg-red-500 rounded-full"></span>
+                결제전 확인 사항
+              </h3>
+              <div className="space-y-4 text-xs sm:text-sm text-gray-600 leading-relaxed">
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-1">(1) 할부기간 선택</h4>
+                  <p className="text-gray-500 text-xs sm:text-[13px]">
+                    무이자할부는 최대 36개월이며, 할부 기간 선택 시 &quot;(무이자)&quot; 표시를 꼭 확인 후 선택해 주시기 바랍니다. &quot;(무이자)&quot; 표기가 없는 할부 기간은 카드사에서 이자가 청구됩니다.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-1">(2) 할부 가능 카드</h4>
+                  <p className="text-gray-500 text-xs sm:text-[13px]">
+                    BC / 롯데 / 하나 / 국민 / 하나, 법인카드 불가
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-1">(3) 카드 한도 확인</h4>
+                  <p className="text-gray-500 text-xs sm:text-[13px]">
+                    결제 카드의 잔여 한도를 확인 후에 결제를 진행해 주세요.
+                  </p>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 mb-1">(4) 분할결제</h4>
+                  <p className="text-gray-500 text-xs sm:text-[13px]">
+                    카드 한도가 부족한 경우 &quot;분할결제 추가하기&quot;를 통해 나누어 결제해 주세요.
+                  </p>
+                </div>
               </div>
             </div>
-          ))}
-        </div>
-
-        {paidAmount < totalAmount && (
-          <button
-            onClick={addRow}
-            className="mt-4 w-full py-4 border-2 border-dashed border-gray-300 text-gray-500 font-bold rounded-xl hover:border-red-500 hover:text-red-500 hover:bg-red-50 transition-colors flex items-center justify-center gap-2"
-          >
-            <Plus className="w-5 h-5" /> 분할결제 추가하기
-          </button>
-        )}
-
-        <div className="mt-8 pt-8 border-t border-gray-100">
-          <button
-            onClick={handlePayment}
-            disabled={!isTotalMatched || paidAmount === totalAmount || isProcessing}
-            className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-black text-lg py-5 rounded-xl shadow-lg transition-all"
-          >
-            {paidAmount === totalAmount ? "결제가 완료되었습니다" : isProcessing ? "처리 중..." : "결제 진행"}
-          </button>
-          {!isTotalMatched && paidAmount < totalAmount && (
-            <p className="text-red-500 text-sm text-center mt-3 font-medium">모든 결제 금액의 합계가 총 결제 금액과 일치해야 합니다.</p>
-          )}
+          </div>
         </div>
       </section>
 
@@ -493,7 +521,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         name="order_info"
         id="order_info"
         method="post"
-        action={isMobile ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "") : (process.env.NEXT_PUBLIC_KCP_PC_URL || "")}
+        action={isMobile
+          ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp")
+          : (process.env.NEXT_PUBLIC_KCP_PC_URL || "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp")}
         className="hidden"
       >
         <input type="hidden" name="pay_method" id="pay_method" value="" />
@@ -503,7 +533,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="customer@vdrobotics.co.kr" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
-        <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || ""} />
+        <input type="hidden" name="site_cd" value={process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000"} />
         <input type="hidden" name="req_tx" value="pay" />
         <input type="hidden" name="currency" value="410" />
         <input type="hidden" name="shop_name" value="브이디로보틱스" />

@@ -11,10 +11,10 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Order not found" });
     }
 
-    // ── KCP 상점코드 필수 확인 ──
-    const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
+    // ── KCP 상점코드 확인 (운영 시 필수, 개발 시 T0000 fallback) ──
+    const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE || (process.env.NODE_ENV === "production" ? "" : "T0000");
     if (!site_cd) {
-      console.error("NEXT_PUBLIC_KCP_SITE_CODE 환경변수 미설정");
+      console.error("NEXT_PUBLIC_KCP_SITE_CODE 환경변수 미설정 (운영 환경)");
       return NextResponse.json({ success: false, error: "결제 시스템 설정 오류" }, { status: 500 });
     }
 

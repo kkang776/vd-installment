@@ -364,13 +364,13 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                 </div>
               </div>
 
-              {/* 02. 수량 및 계약 */}
+              {/* 02. 수량 */}
               <div>
                 <h4 className="text-sm font-bold text-gray-900 mb-4 flex items-center gap-2">
-                  <span className="w-1 h-4 bg-red-500 rounded-full"></span> 02. 수량 및 계약
+                  <span className="w-1 h-4 bg-red-500 rounded-full"></span> 02. 수량
                 </h4>
                 <div className="flex gap-4">
-                  <div className="flex-1">
+                  <div className="w-full">
                     <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden h-12">
                       <button type="button" onClick={() => setQuantity(Math.max(1, quantity - 1))} className="px-4 text-gray-500 hover:bg-gray-50 h-full flex items-center justify-center">
                         <Minus className="w-4 h-4" />
@@ -382,15 +382,6 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                         <Plus className="w-4 h-4" />
                       </button>
                     </div>
-                  </div>
-                  <div className="flex-[2]">
-                    <select
-                      value={contractMonths}
-                      onChange={(e) => setContractMonths(Number(e.target.value))}
-                      className="w-full border border-gray-300 rounded-lg px-4 h-12 outline-none focus:border-red-500"
-                    >
-                      <option value={36}>36개월 (기본)</option>
-                    </select>
                   </div>
                 </div>
               </div>
@@ -443,7 +434,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                   disabled={isSubmitting}
                   className="w-full bg-red-500 hover:bg-red-600 disabled:bg-gray-300 text-white font-bold py-4 rounded-xl transition-all shadow-lg hover:shadow-xl active:scale-[0.98] flex items-center justify-center gap-2 text-base sm:text-lg mt-6"
                 >
-                  {isSubmitting ? "처리 중..." : "36개월 무이자 할부 신청하기"}
+                  {isSubmitting ? "처리 중..." : "주문하기"}
                 </button>
               </div>
             </div>
