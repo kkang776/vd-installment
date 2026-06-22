@@ -222,8 +222,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           const payUrl = data.PayUrl;
           if (isMobile) {
             kcpForm.action = payUrl;
-          } else {
-            kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
           }
           
           if (!isMobile) {
