@@ -155,6 +155,17 @@ async function handleCallback(req: Request) {
           if (approvalResult.quota !== undefined) resolvedQuota = approvalResult.quota;
         } else {
           console.error(`KCP REST API 승인 실패 (Split) — ${approvalResult.message}`);
+          if (process.env.NODE_ENV === "production") {
+            await prisma.paymentTransaction.update({
+              where: { id: transaction.id },
+              data: { status: "FAILED" },
+            });
+            return htmlResponse(`
+              alert("결제 승인 처리 중 오류가 발생했습니다.\\n사유: ${approvalResult.message}");
+              if (window.opener) { window.opener.location.reload(); window.close(); }
+              else { window.location.replace("/"); }
+            `);
+          }
         }
       } else {
         console.warn(`KCP_CERT_PEM 환경변수가 없어 REST API 승인을 시도하지 못했습니다.`);

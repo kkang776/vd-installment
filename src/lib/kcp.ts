@@ -25,6 +25,17 @@ interface KcpCancelResult {
 export async function executeKcpCancel(params: KcpCancelParams): Promise<KcpCancelResult> {
   const { pgTid, cancelAmount, cancelReason } = params;
 
+  if (process.env.KCP_PRIKEY_PEM && process.env.KCP_CERT_PEM) {
+    console.log("KCP_PRIKEY_PEM 감지됨 - KCP REST API (v1/cancel) 취소를 시도합니다.");
+    const { executeKcpRestCancel } = await import("@/lib/kcp-approval");
+    return executeKcpRestCancel({
+      tno: pgTid,
+      cancelAmount: cancelAmount,
+      cancelReason: cancelReason,
+      mod_type: "STSC"
+    });
+  }
+
   const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
   const site_key = process.env.KCP_SITE_KEY;
 
@@ -38,7 +49,7 @@ export async function executeKcpCancel(params: KcpCancelParams): Promise<KcpCanc
     ? process.env.KCP_TRADE_REG_URL.replace("/trade/register.do", "/trade/cancel.do")
     : "https://testsmpay.kcp.co.kr/trade/cancel.do";
 
-  console.log("KCP 결제 취소 요청:", { pgTid, cancelAmount, cancelReason, cancelUrl });
+  console.log("KCP 결제 취소 요청 (Legacy site_key):", { pgTid, cancelAmount, cancelReason, cancelUrl });
 
   try {
     const cancelParams = new URLSearchParams();

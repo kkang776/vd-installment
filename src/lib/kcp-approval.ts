@@ -114,3 +114,88 @@ export async function executeKcpApproval(params: KcpApprovalParams): Promise<Kcp
     return { success: false, message: `통신 오류: ${error.message}` };
   }
 }
+
+export interface KcpCancelParams {
+  tno: string;
+  cancelAmount: number;
+  cancelReason: string;
+  mod_type?: "STSC" | "STPC"; // STSC: 전체취소, STPC: 부분취소
+}
+
+/**
+ * KCP REST API (v1/cancel) 기반 취소 처리 유틸리티
+ */
+export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ success: boolean; message: string; raw?: any }> {
+  const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
+  const kcpCertPem = process.env.KCP_CERT_PEM;
+  const kcpPrikeyPem = process.env.KCP_PRIKEY_PEM;
+
+  if (!site_cd || !kcpCertPem || !kcpPrikeyPem) {
+    console.error("KCP 취소 실패: 필수 환경변수(SITE_CODE, CERT_PEM, PRIKEY_PEM) 누락");
+    return { success: false, message: "KCP 인증서 또는 개인키 환경변수 누락" };
+  }
+
+  const isTest = process.env.NODE_ENV !== "production" || site_cd === "T0000" || site_cd === "A52Q7";
+  const cancelUrl = isTest 
+    ? "https://stg-spl.kcp.co.kr/gw/enc/v1/cancel" 
+    : "https://spl.kcp.co.kr/gw/enc/v1/cancel";
+
+  const certData = kcpCertPem.replace(/\\n/g, '\n');
+  const prikeyData = kcpPrikeyPem.replace(/\\n/g, '\n');
+  const mod_type = params.mod_type || "STSC";
+
+  // kcp_sign_data 서명 생성 (조합: site_cd^tno^mod_type)
+  const signString = `${site_cd}^${params.tno}^${mod_type}`;
+  let kcp_sign_data = "";
+  try {
+    const sign = crypto.createSign('RSA-SHA256');
+    sign.update(signString);
+    kcp_sign_data = sign.sign(prikeyData, 'base64');
+  } catch (err: any) {
+    console.error("KCP 서명 생성 실패:", err);
+    return { success: false, message: "KCP 서명 생성 실패" };
+  }
+
+  const requestBody = {
+    site_cd: site_cd,
+    kcp_cert_info: certData,
+    kcp_sign_data: kcp_sign_data,
+    tno: params.tno,
+    mod_type: mod_type,
+    mod_mny: params.cancelAmount,
+    mod_desc: params.cancelReason
+  };
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+    const response = await fetch(cancelUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json; charset=utf-8" },
+      body: JSON.stringify(requestBody),
+      signal: controller.signal,
+    });
+
+    clearTimeout(timeoutId);
+    const responseText = await response.text();
+    console.log("KCP Cancel Raw Response:", responseText);
+
+    let data: any = {};
+    try {
+      data = JSON.parse(responseText);
+    } catch {
+      return { success: false, message: "KCP 응답 파싱 실패", raw: responseText };
+    }
+
+    const isSuccess = data.res_cd === "0000";
+    return {
+      success: isSuccess,
+      message: isSuccess ? "취소 완료" : `취소 실패: [${data.res_cd}] ${data.res_msg}`,
+      raw: data
+    };
+  } catch (error: any) {
+    console.error("KCP API 취소 통신 에러:", error);
+    return { success: false, message: `통신 오류: ${error.message}` };
+  }
+}
