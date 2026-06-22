@@ -199,9 +199,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       const kcpForm = document.getElementById("order_info") as HTMLFormElement;
       if (kcpForm) {
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
-        (document.getElementById("pay_method") as HTMLInputElement).value = isMobile 
-          ? (pendingRow.method === "CARD" ? "CARD" : "VCNT")
-          : (pendingRow.method === "CARD" ? "100000000000" : "001000000000");
+        (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "CARD" : "VCNT";
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
         (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
