@@ -78,20 +78,21 @@ export async function POST(request: Request) {
       // 환경변수에서 거래등록 URL 가져오기 (테스트/운영 분기)
       const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
 
-      const tradeRegParams = new URLSearchParams();
-      tradeRegParams.append("site_cd", site_cd);
-      tradeRegParams.append("ordr_idxx", kcpOrderNo);
-      tradeRegParams.append("good_mny", amount.toString());
-      tradeRegParams.append("good_name", order.productName);
-      tradeRegParams.append("pay_method", method === "CARD" ? "CARD" : "VCNT");
-      tradeRegParams.append("Ret_URL", `${resolvedBaseUrl}/api/payment/split-callback`);
+      const tradeRegData = {
+        site_cd,
+        ordr_idxx: kcpOrderNo,
+        good_mny: amount.toString(),
+        good_name: order.productName,
+        pay_method: method === "CARD" ? "CARD" : "VCNT",
+        Ret_URL: `${resolvedBaseUrl}/api/payment/split-callback`,
+      };
 
-      console.log("KCP Trade Registration Request:", { url: targetUrl, data: Object.fromEntries(tradeRegParams.entries()) });
+      console.log("KCP Trade Registration Request:", { url: targetUrl, data: tradeRegData });
 
       const tradeRegRes = await fetch(targetUrl, {
         method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: tradeRegParams.toString(),
+        headers: { "Content-Type": "application/json; charset=utf-8" },
+        body: JSON.stringify(tradeRegData),
       });
 
       const rawResText = await tradeRegRes.text();
