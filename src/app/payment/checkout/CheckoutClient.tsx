@@ -219,10 +219,12 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           (document.getElementById("PayUrl") as HTMLInputElement).value = data.PayUrl;
           
           // KCP 결제창 액션 URL 설정
+          const payUrl = data.PayUrl;
           if (isMobile) {
-            kcpForm.action = data.PayUrl;
+            kcpForm.action = payUrl;
+          } else {
+            kcpForm.action = payUrl.substring(0, payUrl.lastIndexOf("/")) + "/jsp/encodingFilter/encodingFilter.jsp";
           }
-          // PC는 JSX에 설정된 NEXT_PUBLIC_KCP_PC_URL (rmApproval.jsp)을 그대로 사용함
           
           if (!isMobile) {
             // PC는 팝업창으로 결제 진행
