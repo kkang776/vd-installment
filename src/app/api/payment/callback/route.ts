@@ -28,7 +28,7 @@ async function handleCallback(req: Request) {
     const url = new URL(req.url);
     const method = req.method;
 
-    // ── 파라미터 파싱 (formData를 한 번만 읽기) ──
+    // ── 파라미터 파싱 ──
     let params: Record<string, string | null> = {};
 
     if (method === "POST") {
@@ -52,7 +52,7 @@ async function handleCallback(req: Request) {
       return NextResponse.json({ success: false, message: "주문번호가 누락되었습니다." }, { status: 400 });
     }
 
-    // 2. DB에서 원주문 정보 조회
+    // DB에서 원주문 정보 조회
     const order = await prisma.order.findUnique({
       where: { orderNumber: ordr_idxx },
     });
@@ -61,65 +61,60 @@ async function handleCallback(req: Request) {
       return NextResponse.json({ success: false, message: "주문 정보를 찾을 수 없습니다." }, { status: 404 });
     }
 
-    // 3. KCP 응답 코드 확인
+    // KCP 응답 코드 확인
     const kcpResCd = res_cd || "0000";
     const kcpResMsg = res_msg || "정상처리";
     let kcpTno = params["tno"] || null;
-    
-    // ── KCP 승인 요청 (enc_data가 있고 tno가 없는 경우) ──
     const enc_data = params["enc_data"];
     const enc_info = params["enc_info"];
     const tran_cd = params["tran_cd"];
-    
+
+    // KCP "인증결과 수신형" 상태인 경우: tno가 오지 않으므로 서버사이드 승인(REST API) 요청
     if (!kcpTno && enc_data) {
-      const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
-      const site_key = process.env.KCP_SITE_KEY;
-      if (site_cd && site_key) {
-        try {
-          const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
-          const approveUrl = targetUrl.replace("/trade/register.do", "/trade/approve.do");
-          
-          const approveParams = new URLSearchParams();
-          approveParams.append("site_cd", site_cd);
-          approveParams.append("site_key", site_key);
-          approveParams.append("ordr_idxx", ordr_idxx);
-          approveParams.append("enc_data", enc_data);
-          approveParams.append("enc_info", enc_info || "");
-          if (tran_cd) approveParams.append("tran_cd", tran_cd);
-          approveParams.append("req_tx", "pay");
-          
-          const approveRes = await fetch(approveUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: approveParams.toString()
-          });
-          
-          const approveText = await approveRes.text();
-          let approveData: any = {};
-          try { approveData = JSON.parse(approveText); } 
-          catch { approveData = Object.fromEntries(new URLSearchParams(approveText).entries()); }
-          
-          if (approveData.res_cd === "0000" || approveData.Code === "0000") {
-            kcpTno = approveData.tno;
-          }
-        } catch (e) {
-          console.error("KCP Approval Error:", e);
+      if (process.env.KCP_CERT_PEM) {
+        console.log(`KCP REST API 승인 요청 시도 — ordr_idxx: ${ordr_idxx}`);
+        const { executeKcpApproval } = await import("@/lib/kcp-approval");
+        const approvalResult = await executeKcpApproval({
+          ordr_idxx,
+          enc_data,
+          enc_info: enc_info || "",
+          tran_cd: tran_cd || undefined
+        });
+
+        if (approvalResult.success && approvalResult.tno) {
+          kcpTno = approvalResult.tno;
+        } else {
+          console.error(`KCP REST API 승인 실패 — ${approvalResult.message}`);
+          return htmlResponse(`
+            alert("거래번호 수신 및 결제 승인에 실패했습니다.\\n${approvalResult.message}");
+            if (window.opener) window.close();
+            else window.location.replace("/");
+          `);
         }
+      } else {
+        console.warn(`KCP_CERT_PEM 환경변수가 없어 REST API 승인을 시도하지 못했습니다.`);
       }
+    }
+
+    if (!kcpTno) {
+      console.error(`KCP tno(거래번호) 미수신 및 승인 불가 — ordr_idxx: ${ordr_idxx}, res_cd: ${kcpResCd}`);
+      return htmlResponse(`
+        alert("결제 승인 처리 중 오류가 발생했습니다. (거래번호 발급 실패)");
+        if (window.opener) window.close();
+        else window.location.replace("/");
+      `);
     }
 
     if (kcpResCd === "0000") {
       // 결제 성공 — 주문 상태 업데이트
-      // Note: pgTid는 PaymentTransaction 모델에 있으므로, Order의 adminNotes에 참조 기록
       await prisma.order.update({
         where: { orderNumber: ordr_idxx },
         data: {
           status: "결제 완료",
-          adminNotes: kcpTno ? `[KCP TID: ${kcpTno}]` : null,
+          adminNotes: kcpTno ? `[KCP TID: ${kcpTno}]` : "[KCP 인증완료 - tno 미수신]",
         },
       });
 
-      // XSS 방지: 변수를 JS 문자열에 직접 삽입하지 않음
       const safeOrderId = encodeURIComponent(ordr_idxx);
       return htmlResponse(`
         alert("결제가 정상적으로 완료되었습니다.");

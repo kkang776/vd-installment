@@ -131,59 +131,32 @@ async function handleCallback(req: Request) {
     let resolvedCardName = card_name || transaction.cardCompanyName || (transaction.method === "CARD" ? "신용카드" : "가상계좌");
     let resolvedQuota = quotaParam ? parseInt(quotaParam, 10) : null;
 
-    // ── KCP 승인 요청 (enc_data가 있고 tno가 없는 경우) ──
+    // ── KCP 승인 요청 (인증만 된 경우 REST API 승인 진행) ──
     const enc_data = params["enc_data"];
     const enc_info = params["enc_info"];
     const tran_cd = params["tran_cd"];
-    
+
     if (!resolvedTno && enc_data) {
-      const site_cd = process.env.NEXT_PUBLIC_KCP_SITE_CODE;
-      const site_key = process.env.KCP_SITE_KEY;
-      
-      if (site_cd && site_key) {
-        try {
-          const targetUrl = process.env.KCP_TRADE_REG_URL || "https://testsmpay.kcp.co.kr/trade/register.do";
-          const approveUrl = targetUrl.replace("/trade/register.do", "/trade/approve.do");
-          
-          const approveParams = new URLSearchParams();
-          approveParams.append("site_cd", site_cd);
-          approveParams.append("site_key", site_key);
-          approveParams.append("ordr_idxx", ordr_idxx);
-          approveParams.append("enc_data", enc_data);
-          approveParams.append("enc_info", enc_info || "");
-          if (tran_cd) approveParams.append("tran_cd", tran_cd);
-          approveParams.append("req_tx", "pay"); // 승인 요청
-          
-          console.log("KCP Approval Request:", approveUrl, approveParams.toString());
-          
-          const approveRes = await fetch(approveUrl, {
-            method: "POST",
-            headers: { "Content-Type": "application/x-www-form-urlencoded" },
-            body: approveParams.toString()
-          });
-          
-          const approveText = await approveRes.text();
-          console.log("KCP Approval Response:", approveText);
-          
-          let approveData: any = {};
-          try {
-            approveData = JSON.parse(approveText);
-          } catch {
-            const urlParams = new URLSearchParams(approveText);
-            approveData = Object.fromEntries(urlParams.entries());
-          }
-          
-          if (approveData.res_cd === "0000" || approveData.Code === "0000") {
-            resolvedTno = approveData.tno;
-            if (approveData.app_no) resolvedAppNo = approveData.app_no;
-            if (approveData.card_name) resolvedCardName = approveData.card_name;
-            if (approveData.quota) resolvedQuota = parseInt(approveData.quota, 10);
-          } else {
-            console.error("KCP Approval Failed:", approveData);
-          }
-        } catch (e) {
-          console.error("KCP Approval Network Error:", e);
+      if (process.env.KCP_CERT_PEM) {
+        console.log(`KCP REST API 승인 요청 시도 (Split) — ordr_idxx: ${ordr_idxx}`);
+        const { executeKcpApproval } = await import("@/lib/kcp-approval");
+        const approvalResult = await executeKcpApproval({
+          ordr_idxx,
+          enc_data,
+          enc_info: enc_info || "",
+          tran_cd: tran_cd || undefined
+        });
+
+        if (approvalResult.success && approvalResult.tno) {
+          resolvedTno = approvalResult.tno;
+          if (approvalResult.app_no) resolvedAppNo = approvalResult.app_no;
+          if (approvalResult.card_name) resolvedCardName = approvalResult.card_name;
+          if (approvalResult.quota !== undefined) resolvedQuota = approvalResult.quota;
+        } else {
+          console.error(`KCP REST API 승인 실패 (Split) — ${approvalResult.message}`);
         }
+      } else {
+        console.warn(`KCP_CERT_PEM 환경변수가 없어 REST API 승인을 시도하지 못했습니다.`);
       }
     }
 
