@@ -503,16 +503,17 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         name="order_info"
         id="order_info"
         method="post"
-        acceptCharset="euc-kr"
         action={isMobile
           ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp")
           : (process.env.NEXT_PUBLIC_KCP_PC_URL || "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp")}
         className="hidden"
       >
+        <input type="hidden" name="encoding_trans" value="UTF-8" />
         <input type="hidden" name="pay_method" id="pay_method" value="" />
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" value={order.productName} />
         <input type="hidden" name="good_mny" id="good_mny" value="" />
+        <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
