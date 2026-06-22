@@ -37,16 +37,38 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
   const progressPercent = (paidAmount / totalAmount) * 100;
 
   const [paymentRows, setPaymentRows] = useState<any[]>(() => {
-    // Reconstruct rows from server data (critical for mobile redirect recovery)
     const dbSuccess = initialOrder.transactions?.filter((t: any) => t.status === "SUCCESS" && t.cancelAmount === 0) || [];
     const dbPaid = dbSuccess.reduce((acc: number, t: any) => acc + t.amount, 0);
     const dbRemaining = initialOrder.totalAmount - dbPaid;
     const successRows = dbSuccess.map((t: any) => ({ ...t, id: t.id }));
+
+    // 복구 로직: 모바일 리다이렉트나 팝업 취소로 인한 새로고침 시 기존 분할 내역 유지
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem('checkout_rows_' + initialOrder.id);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          const parsedPending = parsed.filter((r: any) => r.status === "PENDING" || r.status === "FAILED");
+          const parsedPendingTotal = parsedPending.reduce((sum: number, r: any) => sum + r.amount, 0);
+          
+          if (parsedPendingTotal === dbRemaining) {
+            // DB 잔액과 localStorage PENDING 잔액이 일치하면 복원!
+            return [...successRows, ...parsedPending.map((r: any) => ({...r, status: 'PENDING'}))];
+          }
+        }
+      } catch(e) {}
+    }
+
     if (dbRemaining > 0) {
       return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCBC", kcpCode: "31", cardName: "BC카드", quota: 36, status: "PENDING" }];
     }
     return successRows;
   });
+
+  // 상태 변경될 때마다 localStorage에 저장
+  useEffect(() => {
+    localStorage.setItem('checkout_rows_' + order.id, JSON.stringify(paymentRows));
+  }, [paymentRows, order.id]);
 
   const fetchUpdatedOrder = async () => {
     try {
@@ -73,6 +95,19 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     setOrigin(window.location.origin);
     const ua = navigator.userAgent || navigator.vendor || (window as any).opera;
     setIsMobile(/android|webos|iphone|ipad|ipod|blackberry|iemobile|opera mini/i.test(ua.toLowerCase()));
+
+    // KCP PC 스마트결제 SDK 로드
+    const script = document.createElement("script");
+    const siteCd = process.env.NEXT_PUBLIC_KCP_SITE_CODE || "T0000";
+    script.src = (siteCd === "T0000" || siteCd === "A52Q7")
+      ? "https://testspay.kcp.co.kr/plugin/kcp_spay_hub.js"
+      : "https://spay.kcp.co.kr/plugin/kcp_spay_hub.js";
+    script.async = true;
+    document.body.appendChild(script);
+
+    return () => {
+      document.body.removeChild(script);
+    };
   }, []);
 
   useEffect(() => {
@@ -218,29 +253,22 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
           (document.getElementById("PayUrl") as HTMLInputElement).value = data.PayUrl;
           
-          // KCP 결제창 액션 URL 설정
-          const payUrl = data.PayUrl;
           if (isMobile) {
-            kcpForm.action = payUrl;
-          }
-          
-          if (!isMobile) {
-            // PC는 팝업창으로 결제 진행
-            const popup = window.open("", "kcp_popup", "width=820,height=600,resizable=yes,scrollbars=yes");
-            if (popup) {
-              kcpForm.target = "kcp_popup";
-            } else {
-              // 팝업 차단 시 현재 창에서 진행
-              kcpForm.target = "_self";
-            }
-          } else {
-            // 모바일은 현재 창에서 진행
+            // 모바일은 현재 창에서 PayUrl로 폼 제출
+            kcpForm.action = data.PayUrl;
             kcpForm.target = "_self";
+            setTimeout(() => setIsProcessing(false), 3000); 
+            kcpForm.submit();
+          } else {
+            // PC: KCP PC 스마트결제 SDK 호출 (action, target 변경 불필요, SDK가 알아서 팝업 띄움)
+            if (typeof window !== "undefined" && (window as any).KCP_Pay_Execute_Web) {
+              setTimeout(() => setIsProcessing(false), 3000);
+              (window as any).KCP_Pay_Execute_Web(kcpForm);
+            } else {
+              alert("KCP 결제 모듈이 완전히 로드되지 않았습니다. 잠시 후 다시 시도해주세요.");
+              setIsProcessing(false);
+            }
           }
-          
-          // 진행 중 상태 유지 (팝업 또는 창 이동 대기)
-          setTimeout(() => setIsProcessing(false), 3000); 
-          kcpForm.submit();
         } else {
           alert("결제 등록에 실패했습니다. (approval_key 누락)");
           setIsProcessing(false);
@@ -506,7 +534,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
           : (process.env.NEXT_PUBLIC_KCP_PC_URL || "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp")}
         className="hidden"
       >
-        <input type="hidden" name="encoding_trans" value="UTF-8" />
+        <input type="hidden" name="charset" value="utf-8" />
         <input type="hidden" name="pay_method" id="pay_method" value="" />
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" value={order.productName} />

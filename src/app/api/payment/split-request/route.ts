@@ -84,6 +84,7 @@ export async function POST(request: Request) {
         good_mny: amount.toString(),
         good_name: order.productName,
         pay_method: method === "CARD" ? "CARD" : "VCNT",
+        quotaopt: "36",
         Ret_URL: `${resolvedBaseUrl}/api/payment/split-callback`,
       };
 
