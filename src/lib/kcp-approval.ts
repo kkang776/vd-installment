@@ -4,6 +4,7 @@ export interface KcpApprovalParams {
   ordr_idxx: string;
   enc_data: string;
   enc_info: string;
+  ordr_mony: number;
   tran_cd?: string; // 일반 결제는 보통 00100000, 안 주면 기본값 사용
 }
 
@@ -48,6 +49,7 @@ export async function executeKcpApproval(params: KcpApprovalParams): Promise<Kcp
     site_cd: site_cd,
     kcp_cert_info: certData,
     ordr_idxx: params.ordr_idxx,
+    ordr_mony: params.ordr_mony.toString(),
     enc_data: params.enc_data,
     enc_info: params.enc_info,
     tran_cd: params.tran_cd || "00100000"

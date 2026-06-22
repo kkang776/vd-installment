@@ -76,6 +76,7 @@ async function handleCallback(req: Request) {
         const { executeKcpApproval } = await import("@/lib/kcp-approval");
         const approvalResult = await executeKcpApproval({
           ordr_idxx,
+          ordr_mony: order.totalAmount,
           enc_data,
           enc_info: enc_info || "",
           tran_cd: tran_cd || undefined
