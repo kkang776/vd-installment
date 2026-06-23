@@ -240,7 +240,12 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       const kcpForm = document.getElementById("order_info") as HTMLFormElement;
       if (kcpForm) {
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
-        (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "CARD" : "VCNT";
+        
+        // PC와 모바일의 결제수단 코드 규격 분기 처리
+        const mobilePayMethod = pendingRow.method === "CARD" ? "CARD" : "VCNT";
+        const pcPayMethod = pendingRow.method === "CARD" ? "100000000000" : "001000000000";
+        (document.getElementById("pay_method") as HTMLInputElement).value = isMobile ? mobilePayMethod : pcPayMethod;
+
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
 
         // Set card company restriction using KCP English code (CCXX)
