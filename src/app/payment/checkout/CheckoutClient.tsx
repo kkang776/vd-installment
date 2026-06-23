@@ -265,11 +265,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
 
-        // Set card company restriction using KCP English code (CCXX)
-        if (pendingRow.method === "CARD" && pendingRow.cardCode) {
-          (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
-        }
-
         // KCP 정책 상 50,000원 미만은 할부 불가이므로 일시불(0)로 강제 설정
         const isInstallmentAllowed = pendingRow.amount >= 50000;
         (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? "36" : "0";
