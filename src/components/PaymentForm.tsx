@@ -142,17 +142,24 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
         window.location.href = `/payment/checkout?orderId=${result.orderId}`;
       } else {
         alert(result.error || "주문 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해 주세요.");
+        setIsSubmitting(false);
       }
     } catch (error) {
       console.error(error);
       alert("주문 처리 중 오류가 발생했습니다.");
-    } finally {
       setIsSubmitting(false);
     }
   };
 
   return (
     <>
+      {isSubmitting && (
+        <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="w-16 h-16 border-4 border-white/20 border-t-red-500 rounded-full animate-spin mb-6"></div>
+          <p className="text-white text-xl font-bold">결제 페이지로 이동 중입니다...</p>
+          <p className="text-white/80 mt-2">안전한 결제 환경을 준비하고 있습니다.</p>
+        </div>
+      )}
       <form onSubmit={handleSubmit} className="flex flex-col lg:flex-row gap-8 relative">
         {/* Left Column - Forms */}
         <div className="flex-1 space-y-6">

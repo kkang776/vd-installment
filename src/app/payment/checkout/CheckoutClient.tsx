@@ -135,6 +135,20 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     isProcessingRef.current = isProcessing;
   }, [isProcessing]);
 
+  // KCP SDK 결제 완료(submit) 감지 및 로딩 화면 표시
+  useEffect(() => {
+    const originalSubmit = HTMLFormElement.prototype.submit;
+    HTMLFormElement.prototype.submit = function (...args) {
+      if (this.id === "order_info") {
+        setIsVerifying(true);
+      }
+      return originalSubmit.apply(this, args);
+    };
+    return () => {
+      HTMLFormElement.prototype.submit = originalSubmit;
+    };
+  }, []);
+
   useEffect(() => {
     const handleBeforeUnload = () => {
       // 결제창 이동 중(isProcessing = true)일 때는 롤백하지 않음
@@ -536,7 +550,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         acceptCharset="euc-kr"
         action={isMobile
           ? (process.env.NEXT_PUBLIC_KCP_MOBILE_URL || "https://testmweb.kcp.co.kr/v3/pay/hp_pay.jsp")
-          : (process.env.NEXT_PUBLIC_KCP_PC_URL || "https://testpaygw.kcp.co.kr/scripts/pay_hub/rmApproval.jsp")}
+          : "/api/payment/split-callback"}
         className="hidden"
       >
         <input type="hidden" name="charset" value="utf-8" />
