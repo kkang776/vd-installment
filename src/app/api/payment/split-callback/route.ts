@@ -164,7 +164,7 @@ async function handleCallback(req: Request) {
             return htmlResponse(`
               alert("결제 승인 처리 중 오류가 발생했습니다.\\n사유: ${approvalResult.message}");
               if (window.opener) { window.opener.location.reload(); window.close(); }
-              else { window.location.replace("/payment/checkout/" + "${safeOrderId}"); }
+              else { window.location.replace("/payment/checkout?orderId=" + "${safeOrderId}"); }
             `);
           }
         }
@@ -185,7 +185,7 @@ async function handleCallback(req: Request) {
         return htmlResponse(`
           alert("결제 승인 처리 중 오류가 발생했습니다. (거래번호 발급 실패)");
           if (window.opener) { window.opener.location.reload(); window.close(); }
-          else { window.location.replace("/payment/checkout/" + "${safeOrderId}"); }
+          else { window.location.replace("/payment/checkout?orderId=" + "${safeOrderId}"); }
         `);
       }
       resolvedTno = "DEV_" + Date.now().toString();

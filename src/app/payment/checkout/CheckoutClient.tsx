@@ -571,6 +571,16 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="good_cd" value="00" />
         <input type="hidden" name="Ret_URL" value={`${process.env.NEXT_PUBLIC_BASE_URL || origin}/api/payment/split-callback`} />
 
+        {/* KCP PC SDK Auth Output Fields */}
+        <input type="hidden" name="res_cd" value="" />
+        <input type="hidden" name="res_msg" value="" />
+        <input type="hidden" name="enc_info" value="" />
+        <input type="hidden" name="enc_data" value="" />
+        <input type="hidden" name="ret_pay_method" value="" />
+        <input type="hidden" name="tran_cd" value="" />
+        <input type="hidden" name="use_pay_method" value="" />
+        <input type="hidden" name="ordr_chk" value="" />
+
         {/* Card restrictions & installment */}
         <input type="hidden" name="used_card" id="used_card" value="" />
         <input type="hidden" name="used_card_YN" value="Y" />
