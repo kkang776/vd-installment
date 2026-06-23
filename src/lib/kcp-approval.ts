@@ -140,8 +140,8 @@ export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ s
     ? "https://stg-spl.kcp.co.kr/gw/enc/v1/cancel" 
     : "https://spl.kcp.co.kr/gw/enc/v1/cancel";
 
-  const certData = kcpCertPem.replace(/\\n/g, '\n');
-  const prikeyData = kcpPrikeyPem.replace(/\\n/g, '\n');
+  const certData = kcpCertPem.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '').trim();
+  const prikeyData = kcpPrikeyPem.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '').trim();
   const mod_type = params.mod_type || "STSC";
 
   // kcp_sign_data 서명 생성 (조합: site_cd^tno^mod_type)
@@ -152,8 +152,8 @@ export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ s
     sign.update(signString);
     kcp_sign_data = sign.sign(prikeyData, 'base64');
   } catch (err: any) {
-    console.error("KCP 서명 생성 실패:", err);
-    return { success: false, message: "KCP 서명 생성 실패" };
+    console.error("KCP 서명 생성 실패 상세 원인:", err);
+    return { success: false, message: `KCP 서명 생성 실패: ${err.message}` };
   }
 
   const requestBody = {
