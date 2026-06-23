@@ -48,11 +48,15 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         const saved = localStorage.getItem('checkout_rows_' + initialOrder.id);
         if (saved) {
           const parsed = JSON.parse(saved);
-          const parsedPending = parsed.filter((r: any) => r.status === "PENDING" || r.status === "FAILED");
+          // DB에서 성공 처리된 내역(dbId)은 localStorage 펜딩 목록에서 제외
+          const successDbIds = dbSuccess.map((t: any) => t.id);
+          const parsedPending = parsed.filter((r: any) => 
+            (r.status === "PENDING" || r.status === "FAILED") && !successDbIds.includes(r.dbId)
+          );
           const parsedPendingTotal = parsedPending.reduce((sum: number, r: any) => sum + r.amount, 0);
           
           if (parsedPendingTotal === dbRemaining) {
-            // DB 잔액과 localStorage PENDING 잔액이 일치하면 복원!
+            // DB 잔액과 localStorage PENDING 잔액이 일치하면 복원
             return [...successRows, ...parsedPending.map((r: any) => ({...r, status: 'PENDING'}))];
           }
         }
@@ -151,14 +155,13 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
   useEffect(() => {
     const handleBeforeUnload = () => {
-      // 결제창 이동 중(isProcessing = true)일 때는 롤백하지 않음
-      if (paidAmount > 0 && paidAmount < totalAmount && !isSuccess && !isProcessingRef.current) {
-        navigator.sendBeacon('/api/payment/rollback', JSON.stringify({ orderId: order.id, reason: 'BROWSER_CLOSED' }));
-      }
+      // BROWSER_CLOSED 롤백은 KCP 결제 완료 후 페이지 이동(reload/replace) 중에도 
+      // 트리거되어 정상 결제를 취소시키는 치명적 버그를 유발하므로 제거합니다.
+      // 롤백은 30분 타이머(cron 및 client)에서만 안전하게 처리합니다.
     };
     window.addEventListener("beforeunload", handleBeforeUnload);
     return () => window.removeEventListener("beforeunload", handleBeforeUnload);
-  }, [paidAmount, totalAmount, order.id, isSuccess]);
+  }, []);
 
   useEffect(() => {
     if (paidAmount === totalAmount && totalAmount > 0) {
@@ -266,6 +269,10 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         if (pendingRow.method === "CARD" && pendingRow.cardCode) {
           (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
         }
+
+        // KCP 정책 상 50,000원 미만은 할부 불가이므로 일시불(0)로 강제 설정
+        const isInstallmentAllowed = pendingRow.amount >= 50000;
+        (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? "36" : "0";
 
         if (data.approval_key) {
           (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;

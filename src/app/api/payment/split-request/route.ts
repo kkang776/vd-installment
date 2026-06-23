@@ -23,26 +23,23 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "유효하지 않은 결제 금액입니다." }, { status: 400 });
     }
 
-    // ── 이미 결제된/진행 중인 금액 계산 ──
+    // ── 이미 결제 성공한 금액 계산 ──
     const existingTransactions = await prisma.paymentTransaction.findMany({
-      where: { orderId, status: { in: ["PENDING", "SUCCESS"] } }
+      where: { orderId, status: "SUCCESS", cancelAmount: 0 }
     });
-    const alreadyPaidOrPending = existingTransactions.reduce((acc, t) => acc + t.amount, 0);
+    const alreadyPaid = existingTransactions.reduce((acc, t) => acc + t.amount, 0);
 
-    if (alreadyPaidOrPending + amount > order.totalAmount) {
+    if (alreadyPaid + amount > order.totalAmount) {
       return NextResponse.json({
         success: false,
-        error: `결제 금액 초과: 남은 금액 ${order.totalAmount - alreadyPaidOrPending}원`
+        error: `결제 금액 초과: 남은 금액 ${order.totalAmount - alreadyPaid}원`
       }, { status: 400 });
     }
 
-    // ── 동일 주문에 대해 PENDING 트랜잭션이 이미 있으면 삭제 후 새로 생성 (취소 시 재시도 가능하게) ──
-    const existingPending = await prisma.paymentTransaction.findFirst({
+    // ── 동일 주문에 대해 PENDING 트랜잭션이 이미 있으면 모두 삭제 후 새로 생성 (취소 시 재시도 가능하게) ──
+    await prisma.paymentTransaction.deleteMany({
       where: { orderId, status: "PENDING" },
     });
-    if (existingPending) {
-      await prisma.paymentTransaction.delete({ where: { id: existingPending.id } });
-    }
 
     // ── KCP 주문번호 생성 ──
     const kcpOrderNo = `${order.orderNumber.replace(/[^A-Z0-9]/gi, "")}_${Date.now().toString(36).toUpperCase()}`;

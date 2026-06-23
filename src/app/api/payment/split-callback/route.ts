@@ -51,6 +51,7 @@ async function handleCallback(req: Request) {
 
     const ordr_idxx = params["ordr_idxx"] || null;
     const res_cd = params["res_cd"] || null;
+    const res_msg = params["res_msg"] || null;
     const tno = params["tno"] || null;
     const app_no = params["app_no"] || null;
     const card_name = params["card_name"] || null;
@@ -99,6 +100,7 @@ async function handleCallback(req: Request) {
       });
 
       return htmlResponse(`
+        alert("결제가 실패하거나 취소되었습니다.\\n사유: " + \`${res_msg || '알 수 없는 오류'}\` + "\\n남은 금액에 대해 다시 결제를 시도해 주세요.");
         if (window.opener) { window.opener.location.reload(); window.close(); }
         else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
       `);
