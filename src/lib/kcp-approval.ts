@@ -150,7 +150,14 @@ export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ s
   try {
     const sign = crypto.createSign('RSA-SHA256');
     sign.update(signString);
-    kcp_sign_data = sign.sign(prikeyData, 'base64');
+    
+    // 비밀번호(passphrase)가 설정된 개인키인지 확인
+    const passphrase = process.env.KCP_PRIKEY_PASSPHRASE;
+    if (passphrase) {
+      kcp_sign_data = sign.sign({ key: prikeyData, passphrase }, 'base64');
+    } else {
+      kcp_sign_data = sign.sign(prikeyData, 'base64');
+    }
   } catch (err: any) {
     console.error("KCP 서명 생성 실패 상세 원인:", err);
     return { success: false, message: `KCP 서명 생성 실패: ${err.message}` };
