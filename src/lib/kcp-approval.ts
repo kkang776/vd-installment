@@ -137,8 +137,8 @@ export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ s
 
   const isTest = process.env.NODE_ENV !== "production" || site_cd === "T0000" || site_cd === "A52Q7";
   const cancelUrl = isTest 
-    ? "https://stg-spl.kcp.co.kr/gw/enc/v1/cancel" 
-    : "https://spl.kcp.co.kr/gw/enc/v1/cancel";
+    ? "https://stg-spl.kcp.co.kr/gw/mod/v1/cancel" 
+    : "https://spl.kcp.co.kr/gw/mod/v1/cancel";
 
   const certData = kcpCertPem.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '').trim();
   const prikeyData = kcpPrikeyPem.replace(/\\n/g, '\n').replace(/^["']|["']$/g, '').trim();
@@ -163,15 +163,22 @@ export async function executeKcpRestCancel(params: KcpCancelParams): Promise<{ s
     return { success: false, message: `KCP 서명 생성 실패: ${err.message}` };
   }
 
-  const requestBody = {
+  // KCP 공식 문서에 따른 취소 파라미터 구성
+  const requestBody: any = {
     site_cd: site_cd,
     kcp_cert_info: certData,
     kcp_sign_data: kcp_sign_data,
     tno: params.tno,
     mod_type: mod_type,
-    mod_mny: params.cancelAmount,
-    mod_desc: params.cancelReason
   };
+
+  if (mod_type === "STPC") {
+    // 부분취소일 경우에만 금액 및 취소 사유 추가 (문자열 타입 필수)
+    requestBody.mod_mny = params.cancelAmount.toString();
+    if (params.cancelReason) {
+      requestBody.mod_desc = params.cancelReason;
+    }
+  }
 
   try {
     const controller = new AbortController();
