@@ -242,7 +242,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         (document.getElementById("good_mny") as HTMLInputElement).value = pendingRow.amount.toString();
         (document.getElementById("pay_method") as HTMLInputElement).value = pendingRow.method === "CARD" ? "CARD" : "VCNT";
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
-        (document.getElementById("quotaopt") as HTMLInputElement).value = "36";
 
         // Set card company restriction using KCP English code (CCXX)
         if (pendingRow.method === "CARD" && pendingRow.cardCode) {
@@ -539,7 +538,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" value={order.productName} />
         <input type="hidden" name="good_mny" id="good_mny" value="" />
-        <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
@@ -553,7 +551,6 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="Ret_URL" value={`${process.env.NEXT_PUBLIC_BASE_URL || origin}/api/payment/split-callback`} />
 
         {/* Card restrictions & installment */}
-        <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
         <input type="hidden" name="used_card" id="used_card" value="" />
         <input type="hidden" name="used_card_YN" value="Y" />
       </form>

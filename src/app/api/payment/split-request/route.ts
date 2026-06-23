@@ -36,15 +36,12 @@ export async function POST(request: Request) {
       }, { status: 400 });
     }
 
-    // ── 동일 주문에 대해 PENDING 트랜잭션이 이미 있으면 차단 (중복 방지) ──
+    // ── 동일 주문에 대해 PENDING 트랜잭션이 이미 있으면 삭제 후 새로 생성 (취소 시 재시도 가능하게) ──
     const existingPending = await prisma.paymentTransaction.findFirst({
       where: { orderId, status: "PENDING" },
     });
     if (existingPending) {
-      return NextResponse.json({
-        success: false,
-        error: "이미 진행 중인 결제가 있습니다. 완료 후 다시 시도해주세요."
-      }, { status: 409 });
+      await prisma.paymentTransaction.delete({ where: { id: existingPending.id } });
     }
 
     // ── KCP 주문번호 생성 ──
@@ -84,7 +81,7 @@ export async function POST(request: Request) {
         good_mny: amount.toString(),
         good_name: order.productName,
         pay_method: method === "CARD" ? "CARD" : "VCNT",
-        quotaopt: "36",
+        charset: "utf-8",
         Ret_URL: `${resolvedBaseUrl}/api/payment/split-callback`,
       };
 
