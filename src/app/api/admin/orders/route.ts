@@ -12,7 +12,7 @@ export async function GET() {
     const orders = await prisma.order.findMany({
       where: {
         status: {
-          not: "결제 대기",
+          in: ["PAID", "결제 완료", "CANCELLED", "결제 취소", "ABNORMAL_CANCELLED"],
         },
       },
       orderBy: { createdAt: "desc" },

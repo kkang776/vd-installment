@@ -48,6 +48,14 @@ type Order = {
   createdAt: string;
 };
 
+const getStatusLabel = (status: string) => {
+  if (status === "PAID") return "결제 완료";
+  if (status === "CANCELLED" || status === "ABNORMAL_CANCELLED") return "결제 취소";
+  if (status === "PENDING") return "결제 대기";
+  if (status === "PARTIALLY_PAID") return "부분 결제";
+  return status;
+};
+
 export default function AdminDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
@@ -213,10 +221,12 @@ export default function AdminDashboard() {
     let matchesStatus = false;
     if (filterStatus === "전체") {
       matchesStatus = true;
-    } else if (filterStatus === "비정상 취소") {
-      matchesStatus = order.isAbnormalCancel === true;
+    } else if (filterStatus === "결제 완료") {
+      matchesStatus = order.status === "PAID" || order.status === "결제 완료";
+    } else if (filterStatus === "결제 취소") {
+      matchesStatus = order.status === "CANCELLED" || order.status === "ABNORMAL_CANCELLED" || order.status === "결제 취소" || order.isAbnormalCancel;
     } else {
-      matchesStatus = order.status === filterStatus;
+      matchesStatus = getStatusLabel(order.status) === filterStatus;
     }
     
     return matchesSearch && matchesStatus;
@@ -246,7 +256,7 @@ export default function AdminDashboard() {
         order.monthlyFee,
         order.totalAmount,
         `"${(order.requestNotes || '').replace(/"/g, '""')}"`,
-        `"${order.status}"`,
+        `"${getStatusLabel(order.status)}"`,
         `"${order.isAbnormalCancel ? 'Y' : 'N'}"`,
         `"${(order.cancelReason || '').replace(/"/g, '""')}"`,
         `"${(order.transactions || []).map(t => `${t.method}(${t.amount}):${t.status}`).join(" / ")}"`,
@@ -386,10 +396,10 @@ export default function AdminDashboard() {
                         <td className="px-6 py-4 font-bold text-red-500 whitespace-nowrap">{order.totalAmount.toLocaleString()}원</td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`px-2 py-1 rounded-md text-xs font-medium ${
-                            order.status === "결제 완료" ? "bg-green-100 text-green-700" :
-                            order.status === "결제 취소" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
+                            order.status === "PAID" || order.status === "결제 완료" ? "bg-green-100 text-green-700" :
+                            order.status === "CANCELLED" || order.status === "ABNORMAL_CANCELLED" || order.status === "결제 취소" ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-700"
                           }`}>
-                            {order.status}
+                            {getStatusLabel(order.status)}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
