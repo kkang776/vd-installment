@@ -505,17 +505,7 @@ export default function AdminDashboard() {
                                     관리자 입력
                                   </h4>
                                 <div className="space-y-4">
-                                  <div>
-                                    <label className="block text-xs font-medium text-gray-500 mb-1">상태 변경</label>
-                                    <select 
-                                      value={editForm.status}
-                                      onChange={(e) => setEditForm({...editForm, status: e.target.value})}
-                                      className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
-                                    >
-                                      <option value="결제 완료">결제 완료</option>
-                                      <option value="결제 취소">결제 취소</option>
-                                    </select>
-                                  </div>
+
 
                                   <div>
                                     <label className="block text-xs font-medium text-gray-500 mb-1">기타사항 (관리자 메모)</label>
