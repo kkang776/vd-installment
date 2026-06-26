@@ -265,15 +265,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
 
         (document.getElementById("ordr_idxx") as HTMLInputElement).value = data.kcpOrderNo;
 
-        // KCP PC 모듈(kcp_spay_hub.js)은 특정 카드사 1개 지정 + 36개월 할부 요청 시 
-        // 자체 내장된 최대 할부 개월수 검증 로직에 걸려 팝업을 띄우기도 전에 에러를 발생시키는 버그가 있습니다.
-        // 이를 우회하면서도 허용되지 않은 카드사(삼성, 신한 등) 노출을 막기 위해,
-        // PC 환경에서는 36개월 지원 카드사 5곳을 모두 허용 목록으로 전달하여 KCP 팝업에서 선택하게 합니다.
-        if (isMobile && pendingRow.method === "CARD" && pendingRow.cardCode) {
+        // PC 및 모바일 환경 모두 사용자가 선택한 단일 카드사 코드를 주입하여 팝업에서 해당 카드사만 노출되도록 설정
+        if (pendingRow.method === "CARD" && pendingRow.cardCode) {
           (document.getElementById("used_card") as HTMLInputElement).value = pendingRow.cardCode;
-        } else if (!isMobile && pendingRow.method === "CARD") {
-          // 36개월 지원 5개 카드사: 비씨(CCBC), 롯데(CCLO), 우리(CCWR), 국민(CCKB), 하나(CCHN)
-          (document.getElementById("used_card") as HTMLInputElement).value = "CCBC:CCLO:CCWR:CCKB:CCHN";
         } else {
           (document.getElementById("used_card") as HTMLInputElement).value = "";
         }
