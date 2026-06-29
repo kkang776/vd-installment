@@ -426,11 +426,14 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
 
                 <div className="mt-6 p-4 bg-gray-50 rounded-xl border border-gray-100">
                   <div className="space-y-2 text-[11px] sm:text-xs text-red-500 font-bold">
-                    <div className="flex items-start gap-2">
-                      <span className="shrink-0">(1) 결제가능 카드사 :</span>
-                      <span className="text-gray-600 font-medium">비씨 / 롯데 / 우리 / 국민 / 하나</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="font-bold">(1) 무이자 할부 카드사</span>
+                      <div className="flex flex-col ml-4 text-gray-600 font-medium space-y-0.5">
+                        <span>- 36, 24, 2~12개월 : 롯데 / 현대 / 하나 / 국민 / 신한</span>
+                        <span>- 24, 2~12개월 : BC / 농협 / 삼성 / 우리</span>
+                      </div>
                     </div>
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-2 mt-2">
                       <span className="shrink-0">(2) 법인카드 결제 불가</span>
                     </div>
                   </div>

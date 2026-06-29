@@ -7,11 +7,15 @@ type Order = any;
 
 // 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
-  { code: "CCBC", kcpCode: "31", name: "BC카드" },
   { code: "CCLO", kcpCode: "71", name: "롯데카드" },
-  { code: "CCWR", kcpCode: "33", name: "우리카드" },
-  { code: "CCKB", kcpCode: "11", name: "KB국민카드" },
+  { code: "CCHD", kcpCode: "61", name: "현대카드" },
   { code: "CCHN", kcpCode: "21", name: "하나카드" },
+  { code: "CCKB", kcpCode: "11", name: "KB국민카드" },
+  { code: "CCSH", kcpCode: "41", name: "신한카드" },
+  { code: "CCBC", kcpCode: "31", name: "BC카드" },
+  { code: "CCNH", kcpCode: "91", name: "NH농협카드" },
+  { code: "CCSM", kcpCode: "51", name: "삼성카드" },
+  { code: "CCWR", kcpCode: "33", name: "우리카드" },
 ];
 
 // 천단위 콤마 포맷
@@ -64,7 +68,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
     }
 
     if (dbRemaining > 0) {
-      return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCBC", kcpCode: "31", cardName: "BC카드", quota: 36, status: "PENDING" }];
+      return [...successRows, { id: Date.now(), amount: dbRemaining, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }];
     }
     return successRows;
   });
@@ -200,7 +204,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
       return;
     }
     const newAmount = totalAmount - currentTotal;
-    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCBC", kcpCode: "31", cardName: "BC카드", quota: 36, status: "PENDING" }]);
+    setPaymentRows([...paymentRows, { id: Date.now(), amount: newAmount, method: "CARD", cardCode: "CCLO", kcpCode: "71", cardName: "롯데카드", quota: 36, status: "PENDING" }]);
   };
 
   const removeRow = (id: number) => {
@@ -528,10 +532,12 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
                   </p>
                 </div>
                 <div>
-                  <h4 className="font-bold text-gray-900 mb-1">(2) 할부 가능 카드</h4>
-                  <p className="text-gray-500 text-xs sm:text-[13px]">
-                    BC / 롯데 / 하나 / 국민 / 하나, 법인카드 불가
-                  </p>
+                  <h4 className="font-bold text-gray-900 mb-1">(2) 무이자 할부 카드사</h4>
+                  <div className="flex flex-col text-gray-500 text-xs sm:text-[13px] space-y-0.5">
+                    <span>- 36, 24, 2~12개월 : 롯데 / 현대 / 하나 / 국민 / 신한</span>
+                    <span>- 24, 2~12개월 : BC / 농협 / 삼성 / 우리</span>
+                    <span className="mt-1">*. 법인카드 결제 불가</span>
+                  </div>
                 </div>
                 <div>
                   <h4 className="font-bold text-gray-900 mb-1">(3) 카드 한도 확인</h4>
