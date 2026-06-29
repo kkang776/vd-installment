@@ -8,13 +8,13 @@ type Order = any;
 // 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
   { code: "CCLO", kcpCode: "71", name: "롯데(36)" },
-  { code: "CCHD", kcpCode: "61", name: "현대(36)" },
+  { code: "CCDI", kcpCode: "61", name: "현대(36)" },
   { code: "CCHN", kcpCode: "21", name: "하나(36)" },
-  { code: "CCKB", kcpCode: "11", name: "국민(36)" },
-  { code: "CCSH", kcpCode: "41", name: "신한(36)" },
+  { code: "CCKM", kcpCode: "11", name: "국민(36)" },
+  { code: "CCLG", kcpCode: "41", name: "신한(36)" },
   { code: "CCBC", kcpCode: "31", name: "BC(24)" },
   { code: "CCNH", kcpCode: "91", name: "농협(24)" },
-  { code: "CCSM", kcpCode: "51", name: "삼성(24)" },
+  { code: "CCSS", kcpCode: "51", name: "삼성(24)" },
   { code: "CCWR", kcpCode: "33", name: "우리(24)" },
 ];
 
