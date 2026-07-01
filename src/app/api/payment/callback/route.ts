@@ -89,7 +89,7 @@ async function handleCallback(req: Request) {
           return htmlResponse(`
             alert("거래번호 수신 및 결제 승인에 실패했습니다.\\n${approvalResult.message}");
             if (window.opener) window.close();
-            else window.location.replace("/");
+            else window.location.href = "/";
           `);
         }
       } else {
@@ -102,7 +102,7 @@ async function handleCallback(req: Request) {
       return htmlResponse(`
         alert("결제 승인 처리 중 오류가 발생했습니다. (거래번호 발급 실패)");
         if (window.opener) window.close();
-        else window.location.replace("/");
+        else window.location.href = "/";
       `);
     }
 
@@ -123,7 +123,7 @@ async function handleCallback(req: Request) {
           window.opener.location.replace("/?payment=success&orderId=" + decodeURIComponent("${safeOrderId}"));
           window.close();
         } else {
-          window.location.replace("/?payment=success&orderId=" + decodeURIComponent("${safeOrderId}"));
+          window.location.href = "/?payment=success&orderId=" + decodeURIComponent("${safeOrderId}");
         }
       `);
     } else {
@@ -137,7 +137,7 @@ async function handleCallback(req: Request) {
       return htmlResponse(`
         alert("결제 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
         if (window.opener) window.close();
-        else window.location.replace("/");
+        else window.location.href = "/";
       `);
     }
 
@@ -146,7 +146,7 @@ async function handleCallback(req: Request) {
     return htmlResponse(`
       alert("결제 처리 중 오류가 발생했습니다.");
       if (window.opener) window.close();
-      else window.location.replace("/");
+      else window.location.href = "/";
     `);
   }
 }

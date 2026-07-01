@@ -88,7 +88,7 @@ async function handleCallback(req: Request) {
     if (transaction.status === "SUCCESS") {
       return htmlResponse(`
         if (window.opener) { window.opener.location.reload(); window.close(); }
-        else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+        else { window.location.href = "/payment/checkout?orderId=${transaction.orderId}"; }
       `);
     }
 
@@ -102,7 +102,7 @@ async function handleCallback(req: Request) {
       return htmlResponse(`
         alert("결제가 실패하거나 취소되었습니다.\\n사유: " + \`${res_msg || '알 수 없는 오류'}\` + "\\n남은 금액에 대해 다시 결제를 시도해 주세요.");
         if (window.opener) { window.opener.location.reload(); window.close(); }
-        else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+        else { window.location.href = "/payment/checkout?orderId=${transaction.orderId}"; }
       `);
     }
 
@@ -166,7 +166,7 @@ async function handleCallback(req: Request) {
             return htmlResponse(`
               alert("결제 승인 처리 중 오류가 발생했습니다.\\n사유: ${approvalResult.message}");
               if (window.opener) { window.opener.location.reload(); window.close(); }
-              else { window.location.replace("/payment/checkout?orderId=" + "${safeOrderId}"); }
+              else { window.location.href = "/payment/checkout?orderId=" + "${safeOrderId}"; }
             `);
           }
         }
@@ -187,7 +187,7 @@ async function handleCallback(req: Request) {
         return htmlResponse(`
           alert("결제 승인 처리 중 오류가 발생했습니다. (거래번호 발급 실패)");
           if (window.opener) { window.opener.location.reload(); window.close(); }
-          else { window.location.replace("/payment/checkout?orderId=" + "${safeOrderId}"); }
+          else { window.location.href = "/payment/checkout?orderId=" + "${safeOrderId}"; }
         `);
       }
       resolvedTno = "DEV_" + Date.now().toString();
@@ -254,7 +254,7 @@ async function handleCallback(req: Request) {
 
     return htmlResponse(`
       if (window.opener) { window.opener.location.reload(); window.close(); }
-      else { window.location.replace("/payment/checkout?orderId=${transaction.orderId}"); }
+      else { window.location.href = "/payment/checkout?orderId=${transaction.orderId}"; }
     `);
   } catch (error: any) {
     console.error("Split KCP callback error:", error);
