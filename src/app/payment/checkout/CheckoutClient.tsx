@@ -277,8 +277,9 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         }
 
         // KCP 정책 상 50,000원 미만은 할부 불가이므로 일시불(0)로 강제 설정
+        // 50,000원 이상이면 quotaopt를 비워서 KCP 시스템에 설정된 할부 개월수를 자동으로 불러옴
         const isInstallmentAllowed = pendingRow.amount >= 50000;
-        (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? "36" : "0";
+        (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? "" : "0";
 
         if (data.approval_key) {
           (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
@@ -573,7 +574,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" value={order.productName} />
         <input type="hidden" name="good_mny" id="good_mny" value="" />
-        <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
+        <input type="hidden" name="quotaopt" id="quotaopt" value="" />
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
