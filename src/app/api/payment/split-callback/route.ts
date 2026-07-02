@@ -4,6 +4,52 @@ import { sendAlimtalk } from "@/lib/surem";
 
 export const dynamic = "force-dynamic";
 
+// KCP res_cd 기반 안전한 한글 에러 메시지 매핑
+function getKcpErrorMessage(resCd: string | null): string {
+  if (!resCd) return "알 수 없는 오류";
+  const messages: Record<string, string> = {
+    "3001": "사용자가 결제를 취소하였습니다",
+    "3002": "사용자가 결제를 취소하였습니다",
+    "3007": "사용자가 결제를 취소하였습니다",
+    "8102": "카드 정보가 올바르지 않습니다",
+    "8112": "비밀번호가 올바르지 않습니다",
+    "8131": "한도 초과입니다",
+    "8134": "할부 개월수 오류입니다",
+  };
+  return messages[resCd] || `결제 처리 중 오류가 발생하였습니다 (코드: ${resCd})`;
+}
+
+// EUC-KR POST body 디코딩 유틸
+async function parseFormBody(req: Request): Promise<Record<string, string | null>> {
+  const params: Record<string, string | null> = {};
+  try {
+    const rawBody = await req.arrayBuffer();
+    let bodyStr: string;
+    try {
+      const decoder = new TextDecoder("euc-kr");
+      bodyStr = decoder.decode(rawBody);
+    } catch {
+      bodyStr = new TextDecoder("utf-8").decode(rawBody);
+    }
+    const pairs = bodyStr.split("&");
+    for (const pair of pairs) {
+      const idx = pair.indexOf("=");
+      if (idx === -1) continue;
+      const key = decodeURIComponent(pair.substring(0, idx).replace(/\+/g, " "));
+      const value = decodeURIComponent(pair.substring(idx + 1).replace(/\+/g, " "));
+      params[key] = value;
+    }
+  } catch (e) {
+    console.error("Form body parsing error:", e);
+  }
+  return params;
+}
+
+// 안전한 alert 문자열 이스케이프 (XSS 방지)
+function escapeForAlert(str: string): string {
+  return str.replace(/\\/g, "\\\\").replace(/"/g, '\\"').replace(/'/g, "\\'").replace(/\n/g, "\\n");
+}
+
 export async function GET(req: Request) {
   return handleCallback(req);
 }
@@ -32,14 +78,7 @@ async function handleCallback(req: Request) {
     let params: Record<string, string | null> = {};
 
     if (method === "POST") {
-      try {
-        const formData = await req.formData();
-        for (const [key, value] of formData.entries()) {
-          params[key] = value as string;
-        }
-      } catch {
-        // formData parsing failed
-      }
+      params = await parseFormBody(req);
     }
 
     // Also check URL search params as fallback
@@ -99,8 +138,9 @@ async function handleCallback(req: Request) {
         data: { status: "FAILED" },
       });
 
+      const errorMessage = getKcpErrorMessage(res_cd);
       return htmlResponse(`
-        alert("결제가 실패하거나 취소되었습니다.\\n사유: " + \`${res_msg || '알 수 없는 오류'}\` + "\\n남은 금액에 대해 다시 결제를 시도해 주세요.");
+        alert("결제가 실패하거나 취소되었습니다.\\n사유: ${escapeForAlert(errorMessage)}\\n남은 금액에 대해 다시 결제를 시도해 주세요.");
         if (window.opener) { window.opener.location.reload(); window.close(); }
         else { window.location.href = "/payment/checkout?orderId=${transaction.orderId}"; }
       `);
@@ -163,8 +203,9 @@ async function handleCallback(req: Request) {
               data: { status: "FAILED" },
             });
             const safeOrderId = encodeURIComponent(transaction.orderId);
+            const safeMsg = escapeForAlert(approvalResult.message || "결제 승인 실패");
             return htmlResponse(`
-              alert("결제 승인 처리 중 오류가 발생했습니다.\\n사유: ${approvalResult.message}");
+              alert("결제 승인 처리 중 오류가 발생했습니다.\\n사유: ${safeMsg}");
               if (window.opener) { window.opener.location.reload(); window.close(); }
               else { window.location.href = "/payment/checkout?orderId=" + "${safeOrderId}"; }
             `);

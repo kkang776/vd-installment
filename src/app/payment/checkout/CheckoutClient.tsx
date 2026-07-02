@@ -7,15 +7,15 @@ type Order = any;
 
 // 허용 카드사 목록 (KCP 영문 코드 기준)
 const ALLOWED_CARDS = [
-  { code: "CCLO", kcpCode: "71", name: "롯데(36)" },
-  { code: "CCDI", kcpCode: "61", name: "현대(36)" },
-  { code: "CCHN", kcpCode: "21", name: "하나(36)" },
-  { code: "CCKM", kcpCode: "11", name: "국민(36)" },
-  { code: "CCLG", kcpCode: "41", name: "신한(36)" },
-  { code: "CCBC", kcpCode: "31", name: "BC(24)" },
-  { code: "CCNH", kcpCode: "91", name: "농협(24)" },
-  { code: "CCSS", kcpCode: "51", name: "삼성(24)" },
-  { code: "CCWR", kcpCode: "33", name: "우리(24)" },
+  { code: "CCLO", kcpCode: "71", name: "롯데(36)", maxQuota: 36 },
+  { code: "CCDI", kcpCode: "61", name: "현대(36)", maxQuota: 36 },
+  { code: "CCHN", kcpCode: "21", name: "하나(36)", maxQuota: 36 },
+  { code: "CCKM", kcpCode: "11", name: "국민(36)", maxQuota: 36 },
+  { code: "CCLG", kcpCode: "41", name: "신한(36)", maxQuota: 36 },
+  { code: "CCBC", kcpCode: "31", name: "BC(24)", maxQuota: 24 },
+  { code: "CCNH", kcpCode: "91", name: "농협(24)", maxQuota: 24 },
+  { code: "CCSS", kcpCode: "51", name: "삼성(24)", maxQuota: 24 },
+  { code: "CCWR", kcpCode: "33", name: "우리(24)", maxQuota: 24 },
 ];
 
 // 천단위 콤마 포맷
@@ -277,9 +277,11 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         }
 
         // KCP 정책 상 50,000원 미만은 할부 불가이므로 일시불(0)로 강제 설정
-        // 50,000원 이상이면 quotaopt를 비워서 KCP 시스템에 설정된 할부 개월수를 자동으로 불러옴
+        // 50,000원 이상이면 카드사별 최대 할부 개월수로 설정 (롯데/현대/하나/국민/신한=36, BC/농협/삼성/우리=24)
         const isInstallmentAllowed = pendingRow.amount >= 50000;
-        (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? "" : "0";
+        const selectedCard = ALLOWED_CARDS.find(c => c.code === pendingRow.cardCode);
+        const maxQuota = selectedCard?.maxQuota || 36;
+        (document.getElementById("quotaopt") as HTMLInputElement).value = isInstallmentAllowed ? String(maxQuota) : "0";
 
         if (data.approval_key) {
           (document.getElementById("approval_key") as HTMLInputElement).value = data.approval_key;
@@ -574,7 +576,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="ordr_idxx" id="ordr_idxx" value="" />
         <input type="hidden" name="good_name" value={order.productName} />
         <input type="hidden" name="good_mny" id="good_mny" value="" />
-        <input type="hidden" name="quotaopt" id="quotaopt" value="" />
+        <input type="hidden" name="quotaopt" id="quotaopt" value="36" />
         <input type="hidden" name="buyr_name" value={order.ordererName} />
         <input type="hidden" name="buyr_mail" value="" />
         <input type="hidden" name="buyr_tel1" value={order.ordererPhone} />
