@@ -587,7 +587,7 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
         <input type="hidden" name="approval_key" id="approval_key" value="" />
         <input type="hidden" name="PayUrl" id="PayUrl" value="" />
         <input type="hidden" name="good_cd" value="00" />
-        <input type="hidden" name="Ret_URL" value={`${process.env.NEXT_PUBLIC_BASE_URL || origin}/api/payment/split-callback`} />
+        <input type="hidden" name="Ret_URL" value={`${process.env.NEXT_PUBLIC_BASE_URL || origin}/api/payment/split-callback?fallbackOrderId=${order.id}`} />
 
         {/* KCP PC SDK Auth Output Fields */}
         <input type="hidden" name="res_cd" value="" />

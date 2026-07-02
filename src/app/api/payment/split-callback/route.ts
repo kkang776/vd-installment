@@ -97,8 +97,15 @@ async function handleCallback(req: Request) {
     const quotaParam = params["quota"] || null;
     const good_mny = params["good_mny"] || null;
 
-    // If no order ID, redirect back to home gracefully
+    // If no order ID, use fallbackOrderId to redirect back to checkout
     if (!ordr_idxx) {
+      const fallbackOrderId = url.searchParams.get("fallbackOrderId");
+      if (fallbackOrderId) {
+        return htmlResponse(`
+          if (window.opener) { window.opener.location.reload(); window.close(); }
+          else { window.location.href = "/payment/checkout?orderId=${encodeURIComponent(fallbackOrderId)}"; }
+        `);
+      }
       return htmlResponse(`
         if (window.opener) { window.opener.location.reload(); window.close(); }
         else { window.location.replace("/"); }
@@ -116,6 +123,14 @@ async function handleCallback(req: Request) {
     }
 
     if (!transaction) {
+      const fallbackOrderId = url.searchParams.get("fallbackOrderId");
+      if (fallbackOrderId) {
+        return htmlResponse(`
+          alert("결제 정보를 찾을 수 없습니다.");
+          if (window.opener) { window.opener.location.reload(); window.close(); }
+          else { window.location.href = "/payment/checkout?orderId=${encodeURIComponent(fallbackOrderId)}"; }
+        `);
+      }
       return htmlResponse(`
         alert("결제 정보를 찾을 수 없습니다.");
         if (window.opener) { window.opener.location.reload(); window.close(); }
