@@ -539,7 +539,8 @@ export default function CheckoutClient({ initialOrder }: { initialOrder: Order }
                   <div className="flex flex-col text-gray-500 text-xs sm:text-[13px] space-y-0.5">
                     <span>- 36, 24, 2~12개월 : 롯데 / 현대 / 하나 / 국민 / 신한</span>
                     <span>- 24, 2~12개월 : BC / 농협 / 삼성 / 우리</span>
-                    <span className="mt-1">*. 법인카드 결제 불가</span>
+                    <span className="mt-1">* BC카드 예외 : IBK/신한 최대12개월, KB국민 최대 18개월</span>
+                    <span className="mt-1">* 법인카드 결제 불가</span>
                   </div>
                 </div>
                 <div>
