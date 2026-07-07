@@ -431,6 +431,7 @@ export default function PaymentForm({ onOpenModal, onOpenProductDetail }: {
                       <div className="flex flex-col ml-4 text-gray-600 font-medium space-y-0.5">
                         <span>- 36, 24, 2~12개월 : 롯데 / 현대 / 하나 / 국민 / 신한</span>
                         <span>- 24, 2~12개월 : BC / 농협 / 삼성 / 우리</span>
+                        <span>- BC카드 예외 : IBK/신한 최대12개월, KB국민 최대 18개월</span>
                       </div>
                     </div>
                     <div className="flex items-start gap-2 mt-2">
