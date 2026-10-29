@@ -19,25 +19,57 @@ function getKcpErrorMessage(resCd: string | null): string {
   return messages[resCd] || `결제 처리 중 오류가 발생하였습니다 (코드: ${resCd})`;
 }
 
-// EUC-KR POST body 디코딩 유틸
+// x-www-form-urlencoded 값을 바이트로 퍼센트 디코딩 후 지정 charset으로 변환
+function percentDecode(input: string, charset: string): string {
+  const bytes: number[] = [];
+  for (let i = 0; i < input.length; i++) {
+    const ch = input[i];
+    if (ch === "+") {
+      bytes.push(0x20);
+    } else if (ch === "%" && i + 2 < input.length && /^[0-9a-fA-F]{2}$/.test(input.substr(i + 1, 2))) {
+      bytes.push(parseInt(input.substr(i + 1, 2), 16));
+      i += 2;
+    } else {
+      bytes.push(input.charCodeAt(i) & 0xff);
+    }
+  }
+  const arr = new Uint8Array(bytes);
+  try {
+    return new TextDecoder(charset).decode(arr);
+  } catch {
+    return new TextDecoder("utf-8").decode(arr);
+  }
+}
+
+// POST body 디코딩 유틸 (UTF-8 / EUC-KR 모두 지원)
 async function parseFormBody(req: Request): Promise<Record<string, string | null>> {
   const params: Record<string, string | null> = {};
   try {
     const rawBody = await req.arrayBuffer();
-    let bodyStr: string;
-    try {
-      const decoder = new TextDecoder("euc-kr");
-      bodyStr = decoder.decode(rawBody);
-    } catch {
-      bodyStr = new TextDecoder("utf-8").decode(rawBody);
+    // urlencoded body는 ASCII이므로 latin1로 읽어 원본 바이트 보존
+    const bodyStr = new TextDecoder("latin1").decode(rawBody);
+    const pairs = bodyStr.split("&").filter(Boolean);
+
+    // charset 파라미터 우선 탐색 (KCP는 charset 필드를 전송)
+    let charset = "euc-kr";
+    for (const pair of pairs) {
+      const [k, v] = pair.split("=");
+      if (k === "charset" && v) {
+        charset = percentDecode(v, "utf-8").trim().toLowerCase() || charset;
+        break;
+      }
     }
-    const pairs = bodyStr.split("&");
+
     for (const pair of pairs) {
       const idx = pair.indexOf("=");
       if (idx === -1) continue;
-      const key = decodeURIComponent(pair.substring(0, idx).replace(/\+/g, " "));
-      const value = decodeURIComponent(pair.substring(idx + 1).replace(/\+/g, " "));
-      params[key] = value;
+      try {
+        const key = percentDecode(pair.substring(0, idx), charset);
+        const value = percentDecode(pair.substring(idx + 1), charset);
+        params[key] = value;
+      } catch (e) {
+        console.error("Form field parsing error:", pair.substring(0, idx), e);
+      }
     }
   } catch (e) {
     console.error("Form body parsing error:", e);
